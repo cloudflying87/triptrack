@@ -32,7 +32,11 @@ class Vehicle(models.Model):
     name = models.CharField(max_length=100)
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
+    vin = models.CharField(max_length=100,null=True, blank=True)
+    license_plate = models.CharField(max_length=20, null=True, blank=True)
     year = models.PositiveIntegerField()
+    starting_mileage = models.PositiveIntegerField(null=True, blank=True)
+    model = models.CharField(max_length=100)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='car')
     image = ProcessedImageField(
         upload_to='vehicle_images/',
@@ -112,6 +116,7 @@ class Event(models.Model):
     gallons = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True)
     price_per_gallon = models.DecimalField(max_digits=5, decimal_places=3, null=True, blank=True)
     total_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    milespergallon = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     
     # Maintenance specific fields
     maintenance_category = models.ForeignKey(MaintenanceCategory, on_delete=models.SET_NULL, 

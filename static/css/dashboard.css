@@ -1,0 +1,464 @@
+/* static/css/dashboard.css */
+
+/* Dashboard Layout */
+.dashboard-container {
+    padding: 20px 0;
+}
+
+.dashboard-card {
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    background-color: #fff;
+    overflow: hidden;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Dashboard Card Headers */
+.dashboard-card-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background-color: var(--triptracker-blue);
+    color: white;
+}
+
+.dashboard-card-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Dashboard Card Content */
+.dashboard-card-body {
+    padding: 20px;
+}
+
+/* Quick Stats Cards */
+.stat-card {
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.stat-card.primary {
+    background-color: var(--triptracker-blue);
+}
+
+.stat-card.success {
+    background-color: var(--secondary-color);
+}
+
+.stat-card.warning {
+    background-color: var(--warning-color);
+}
+
+.stat-card.danger {
+    background-color: var(--danger-color);
+}
+
+.stat-card-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 5px;
+}
+
+.stat-card-label {
+    font-size: 1rem;
+    font-weight: 400;
+    opacity: 0.9;
+}
+
+.stat-card-icon {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 3rem;
+    opacity: 0.3;
+}
+
+/* Vehicle Cards */
+.vehicle-cards {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin: 0 -10px;
+}
+
+.vehicle-card-wrapper {
+    width: 280px;
+    min-width: 280px;
+    padding: 0 10px;
+}
+
+.vehicle-card {
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    background-color: white;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s;
+}
+
+.vehicle-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.vehicle-card-image {
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+    background-color: #f5f5f5;
+    position: relative;
+}
+
+.vehicle-card-image-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 3rem;
+    color: #aaa;
+}
+
+.vehicle-card-content {
+    padding: 15px;
+    flex-grow: 1;
+}
+
+.vehicle-card-title {
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.vehicle-card-subtitle {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+}
+
+.vehicle-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.vehicle-card-stat {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 0.85rem;
+    color: #555;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.vehicle-card-footer {
+    padding: 10px 15px;
+    border-top: 1px solid #f0f0f0;
+    background-color: #fafafa;
+    display: flex;
+    justify-content: space-between;
+}
+
+.vehicle-card-footer a {
+    font-size: 0.9rem;
+}
+
+/* Recent Events List */
+.recent-events-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.event-item {
+    padding: 15px;
+    border-left: 4px solid #ddd;
+    margin-bottom: 10px;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.event-item:hover {
+    transform: translateX(5px);
+}
+
+.event-item.maintenance {
+    border-left-color: var(--secondary-color);
+}
+
+.event-item.gas {
+    border-left-color: var(--warning-color);
+}
+
+.event-item.outing {
+    border-left-color: var(--primary-color);
+}
+
+.event-title {
+    font-weight: 600;
+    margin: 0 0 5px 0;
+}
+
+.event-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Maintenance Due */
+.maintenance-alert {
+    background-color: #fff8e1;
+    border-left: 4px solid var(--warning-color);
+    padding: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.maintenance-alert:hover {
+    transform: translateX(5px);
+}
+
+.maintenance-alert-icon {
+    font-size: 1.5rem;
+    color: var(--warning-color);
+    margin-right: 15px;
+}
+
+.maintenance-alert-content {
+    flex-grow: 1;
+}
+
+.maintenance-alert-title {
+    font-weight: 600;
+    margin: 0 0 5px 0;
+}
+
+.maintenance-alert-details {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* To-Do Items */
+.todo-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.todo-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px 15px;
+    border-radius: 5px;
+    background-color: white;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.todo-checkbox {
+    margin-right: 15px;
+    margin-top: 3px;
+}
+
+.todo-content {
+    flex-grow: 1;
+}
+
+.todo-title {
+    margin: 0 0 3px 0;
+    font-weight: 500;
+}
+
+.todo-details {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.todo-actions {
+    margin-left: 10px;
+}
+
+.todo-actions a {
+    color: var(--dark-gray);
+    margin-left: 5px;
+    font-size: 0.9rem;
+}
+
+/* Dashboard Charts */
+.chart-container {
+    height: 300px;
+    width: 100%;
+    position: relative;
+}
+
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+.chart-legend-item {
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+    margin-bottom: 10px;
+}
+
+.chart-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 5px;
+}
+
+.chart-legend-label {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+/* Cost Summary */
+.cost-summary {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -10px;
+}
+
+.cost-item {
+    flex: 1;
+    min-width: 150px;
+    padding: 15px;
+    margin: 0 10px 10px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.cost-item.maintenance {
+    background-color: rgba(52, 168, 83, 0.1);
+    border: 1px solid rgba(52, 168, 83, 0.2);
+}
+
+.cost-item.gas {
+    background-color: rgba(251, 188, 5, 0.1);
+    border: 1px solid rgba(251, 188, 5, 0.2);
+}
+
+.cost-item.total {
+    background-color: rgba(66, 133, 244, 0.1);
+    border: 1px solid rgba(66, 133, 244, 0.2);
+}
+
+.cost-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.cost-label {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+/* Family Section */
+.family-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.family-item {
+    padding: 15px;
+    background-color: white;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.family-item:hover {
+    transform: translateX(5px);
+}
+
+.family-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.family-item-title {
+    font-weight: 600;
+    margin: 0;
+}
+
+.family-item-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.family-item-stat {
+    display: flex;
+    align-items: center;
+}
+
+.family-item-stat-icon {
+    margin-right: 5px;
+    color: var(--triptracker-blue);
+}
+
+.family-item-stat-value {
+    font-weight: 500;
+}
+
+/* Responsive tweaks */
+@media (max-width: 992px) {
+    .vehicle-cards {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 768px) {
+    .stat-card {
+        min-height: 100px;
+    }
+    
+    .stat-card-value {
+        font-size: 2rem;
+    }
+    
+    .stat-card-icon {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .cost-item {
+        min-width: 100%;
+        margin-bottom: 10px;
+    }
+}

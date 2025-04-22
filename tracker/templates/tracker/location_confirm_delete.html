@@ -1,0 +1,30 @@
+<!-- tracker/templates/tracker/location_confirm_delete.html -->
+{% extends 'tracker/base.html' %}
+{% block title %}TripTracker - Delete {{ location.name }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h3 class="card-title">Confirm Deletion</h3>
+            </div>
+            <div class="card-body">
+                <p class="lead">Are you sure you want to delete the location <strong>{{ location.name }}</strong>?</p>
+                <p>This action cannot be undone.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex mt-4">
+                        <button type="submit" class="btn btn-danger me-2">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                        <a href="{% url 'location_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

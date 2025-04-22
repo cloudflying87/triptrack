@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse_lazy
 from django.utils import timezone
-
+from django.conf import settings
+import os
 from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory, MaintenanceSchedule, Family
 from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm, 
                   OutingEventForm, TodoItemForm, LocationForm, UserRegisterForm,
@@ -99,7 +100,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 class FamilyMemberRequiredMixin(UserPassesTestMixin):
     def test_func(self):
-        # For views with family_id in kwargs
+        # For views with pk in kwargs (for Family objects)
+        if 'pk' in self.kwargs:
+            family_id = self.kwargs.get('pk')
+            return self.request.user.families.filter(id=family_id).exists()
+        
+        # For views with family_id in kwargs (for other objects)
         if 'family_id' in self.kwargs:
             family_id = self.kwargs.get('family_id')
             return self.request.user.families.filter(id=family_id).exists()
@@ -185,15 +191,31 @@ class FamilyMemberAddView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     
     def test_func(self):
         family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
+        print(f"Family ID from kwargs: {self.kwargs.get('pk')}")  # Debug print
         return self.request.user == family.created_by
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        family_pk = self.kwargs.get('pk')
+        family = get_object_or_404(Family, pk=family_pk)
+        context['family'] = family
+        return context
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
+        print(f"Family PK from kwargs: {self.kwargs.get('pk')}")  # Debug print
         family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
+        print(f"Retrieved family: {family} with ID: {family.pk}")  # Debug print
         kwargs['family'] = family
         return kwargs
     
     def form_valid(self, form):
+        print(f"Form data: {form.cleaned_data}")  # Debug print
+        family_pk = self.kwargs.get('pk')
+        print(f"Family PK from kwargs: {family_pk}")  # Debug print
+        
+        family = get_object_or_404(Family, pk=family_pk)
+        print(f"Retrieved family: {family} with ID: {family.pk}")
         family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
         email = form.cleaned_data['email']
         
@@ -378,7 +400,7 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         event = form.save(commit=False)
-        event.user = self.request.user
+        event.created_by = self.request.user
         event.event_type = 'maintenance'
         event.save()
         messages.success(self.request, 'Maintenance record added successfully!')
@@ -421,8 +443,9 @@ class GasCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         event = form.save(commit=False)
-        event.user = self.request.user
+        event.created_by = self.request.user
         event.event_type = 'gas'
+        
         event.save()
         messages.success(self.request, 'Gas fill-up record added successfully!')
         return redirect('vehicle_detail', pk=event.vehicle.pk)
@@ -451,7 +474,7 @@ class OutingCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         event = form.save(commit=False)
-        event.user = self.request.user
+        event.created_by = self.request.user
         event.event_type = 'outing'
         event.save()
         messages.success(self.request, 'Outing record added successfully!')
@@ -509,25 +532,33 @@ class EventDeleteView(LoginRequiredMixin, DeleteView):
         # Check if user is in the family that owns the vehicle
         return self.request.user.families.filter(id=event.vehicle.family.id).exists()
 
-class TodoListView(LoginRequiredMixin, ListView):
-    model = TodoItem
-    context_object_name = 'todos'
-    template_name = 'tracker/todo_list.html'
+class TodoPermissionMixin:
+    """Mixin to handle consistent permissions for TodoItem views"""
     
     def get_queryset(self):
+        """Return todos the user has access to"""
         return TodoItem.objects.filter(
-            Q(user=self.request.user) | Q(shared_with=self.request.user)
-        ).distinct().order_by('completed', '-created_at')
-
-class TodoDetailView(LoginRequiredMixin, DetailView):
-    model = TodoItem
-    context_object_name = 'todo'
-    template_name = 'tracker/todo_detail.html'
-    
-    def get_queryset(self):
-        return TodoItem.objects.filter(
-            Q(user=self.request.user) | Q(shared_with=self.request.user)
+            Q(created_by=self.request.user) | 
+            Q(shared_with=self.request.user) |
+            Q(vehicle__family__members=self.request.user)
         ).distinct()
+    
+    def has_permission(self, todo_item):
+        """Check if user has permission for a specific todo item"""
+        # Get the vehicle's family (if the todo is associated with a vehicle)
+        vehicle_family = todo_item.vehicle.family if todo_item.vehicle else None
+        
+        # Check the permission cases
+        is_family_member = vehicle_family and self.request.user.families.filter(id=vehicle_family.id).exists()
+        return (todo_item.created_by == self.request.user or 
+                self.request.user in todo_item.shared_with.all() or
+                is_family_member)
+    
+    def has_change_permission(self, todo_item):
+        """Check if user can modify a todo item (toggle, update, delete)"""
+        # For editing, we'll apply the same rule as for viewing
+        # Any family member, creator, or shared user can modify
+        return self.has_permission(todo_item)
 
 class TodoCreateView(LoginRequiredMixin, CreateView):
     model = TodoItem
@@ -541,14 +572,27 @@ class TodoCreateView(LoginRequiredMixin, CreateView):
         return kwargs
     
     def form_valid(self, form):
-        todo = form.save(commit=False)
-        todo.user = self.request.user
-        todo.save()
-        form.save_m2m()
+        form.instance.created_by = self.request.user
         messages.success(self.request, 'Todo item added successfully!')
         return super().form_valid(form)
+        
+class TodoListView(LoginRequiredMixin, TodoPermissionMixin, ListView):
+    model = TodoItem
+    context_object_name = 'todos'
+    template_name = 'tracker/todo_list.html'
+    
+    def get_queryset(self):
+        # Use the mixin's get_queryset and add ordering
+        return super().get_queryset().order_by('completed', '-created_at')
 
-class TodoUpdateView(LoginRequiredMixin, UpdateView):
+class TodoDetailView(LoginRequiredMixin, TodoPermissionMixin, DetailView):
+    model = TodoItem
+    context_object_name = 'todo'
+    template_name = 'tracker/todo_detail.html'
+    
+    # No need to override get_queryset - it's in the mixin
+
+class TodoUpdateView(LoginRequiredMixin, TodoPermissionMixin, UpdateView):
     model = TodoItem
     form_class = TodoItemForm
     template_name = 'tracker/todo_form.html'
@@ -560,42 +604,62 @@ class TodoUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
     
     def get_queryset(self):
-        # Only allow owner to update
-        return TodoItem.objects.filter(user=self.request.user)
+        # Only allow those with change permission to update
+        base_queryset = super().get_queryset()
+        # Filter further if needed - for example, if you still want to 
+        # restrict updates to only the creator, uncomment the next line
+        # return base_queryset.filter(created_by=self.request.user)
+        return base_queryset
     
     def form_valid(self, form):
         messages.success(self.request, 'Todo item updated successfully!')
         return super().form_valid(form)
 
-class TodoDeleteView(LoginRequiredMixin, DeleteView):
+class TodoDeleteView(LoginRequiredMixin, TodoPermissionMixin, DeleteView):
     model = TodoItem
     template_name = 'tracker/todo_confirm_delete.html'
     success_url = reverse_lazy('todo_list')
     
     def get_queryset(self):
-        # Only allow owner to delete
-        return TodoItem.objects.filter(user=self.request.user)
+        # Only allow those with change permission to delete
+        base_queryset = super().get_queryset()
+        # Filter further if needed - for example, if you want to
+        # restrict deletions to only the creator, uncomment the next line
+        # return base_queryset.filter(created_by=self.request.user)
+        return base_queryset
     
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Todo item deleted successfully!')
         return super().delete(request, *args, **kwargs)
 
-class TodoToggleView(LoginRequiredMixin, View):
+class TodoToggleView(LoginRequiredMixin, TodoPermissionMixin, View):
     def post(self, request, pk):
-        todo = get_object_or_404(
-            Q(user=request.user) | Q(shared_with=request.user),
-            TodoItem, 
-            pk=pk
-        )
-        
-        # Only the owner can toggle completion
-        if todo.user == request.user:
-            todo.completed = not todo.completed
-            todo.save()
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'status': 'success', 'completed': todo.completed})
-        
+        try:
+            todo_item = get_object_or_404(self.get_queryset(), pk=pk)
+            
+            if self.has_change_permission(todo_item):
+                todo_item.completed = not todo_item.completed
+                todo_item.save()
+                messages.success(request, "Todo item status updated successfully.")
+            else:
+                messages.error(request, "You don't have permission to update this todo item.")
+                
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'success',
+                    'completed': todo_item.completed,
+                    'message': "Status updated successfully."
+                })
+                
+        except TodoItem.DoesNotExist:
+            messages.error(request, "This todo item doesn't exist or has been deleted.")
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error',
+                    'message': "This todo item doesn't exist or has been deleted."
+                }, status=404)
+                
         return redirect('todo_list')
 
 class LocationListView(LoginRequiredMixin, ListView):
@@ -604,7 +668,11 @@ class LocationListView(LoginRequiredMixin, ListView):
     template_name = 'tracker/location_list.html'
     
     def get_queryset(self):
-        return Location.objects.filter(created_by=self.request.user)
+        locations = Location.objects.filter(created_by=self.request.user)
+        print(f"User {self.request.user.username} has {locations.count()} locations.")
+        print(f"Found {locations.count()} locations for user {self.request.user.username}")
+        print(f"Locations: {list(locations.values('id', 'name'))}")
+        return locations
 
 class LocationDetailView(LoginRequiredMixin, DetailView):
     model = Location
@@ -621,11 +689,12 @@ class LocationCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('location_list')
     
     def form_valid(self, form):
-        location = form.save(commit=False)
-        location.created_by = self.request.user
-        location.save()
+        form.instance.created_by = self.request.user
+        print(f"About to save location: {form.cleaned_data}")
+        response = super().form_valid(form)
+        print(f"Location saved with ID: {self.object.id}")
         messages.success(self.request, 'Location added successfully!')
-        return super().form_valid(form)
+        return response
 
 class LocationUpdateView(LoginRequiredMixin, UpdateView):
     model = Location
@@ -1043,7 +1112,13 @@ def register(request):
 
 def service_worker(request):
     """View for service worker script"""
-    return render(request, 'sw.js', content_type='application/javascript')
+    
+    path = os.path.join(settings.BASE_DIR, 'sw.js')
+    
+    with open(path, 'r') as sw_file:
+        content = sw_file.read()
+    
+    return HttpResponse(content, content_type='application/javascript')
 
 
 def health_check(request):
@@ -1093,8 +1168,6 @@ class LandingPageView(TemplateView):
         if request.user.is_authenticated:
             return redirect('dashboard')
         return super().dispatch(request, *args, **kwargs)
-
-
 
 class CustomLogoutView(LogoutView):
     """

@@ -3,20 +3,30 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Toggle todo completion
     const todoCheckboxes = document.querySelectorAll('.todo-checkbox');
-    
+
     todoCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             const todoId = this.dataset.todoId;
             const todoItem = document.getElementById(`todo-item-${todoId}`);
+            // Get CSRF token from cookie or meta tag
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
             
             // Send AJAX request to toggle status
             fetch(`/todos/${todoId}/toggle/`, {
-                method: 'GET',
+                method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                }
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.completed) {
                     todoItem.classList.add('completed');
@@ -36,10 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         todoList.appendChild(todoItem);
                     }
                 }
+            })
+            .catch(error => {
+                console.error('Error toggling todo item:', error);
+                // Revert checkbox state on error
+                this.checked = !this.checked;
             });
         });
     });
-    
+        
     // Show/hide fields based on vehicle type - FIXED with null checks
     const vehicleTypeField = document.getElementById('id_vehicle');
     
@@ -82,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-    
+
     // MPG Chart - Added check for Chart global
     const mpgChartCanvas = document.getElementById('mpgChart');
     
@@ -118,10 +133,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Register service worker for PWA
+    // Enhanced Service Worker Registration
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')  
-            .then(reg => console.log('Service Worker registered', reg))
-            .catch(err => console.log('Service Worker registration failed', err));
+        // Unregister any existing service workers first
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for(let registration of registrations) {
+                registration.unregister().then(success => {
+                    console.log('Service worker unregistered:', success);
+                    
+                    // Only register a new one if we want to use PWA features
+                    const enablePWA = false; // Set to true when you're ready for PWA features
+                    
+                    if (enablePWA) {
+                        // Register new service worker with proper error handling
+                        navigator.serviceWorker.register('/sw.js')
+                            .then(registration => {
+                                console.log('Service Worker registered with scope:', registration.scope);
+                                
+                                // Handle updates
+                                registration.addEventListener('updatefound', () => {
+                                    const newWorker = registration.installing;
+                                    
+                                    newWorker.addEventListener('statechange', () => {
+                                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                            // New service worker is waiting
+                                            console.log('New service worker is waiting to activate');
+                                            
+                                            // Show update notification to user
+                                            if (confirm('A new version is available. Reload to update?')) {
+                                                window.location.reload();
+                                            }
+                                        }
+                                    });
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Service Worker registration failed:', error);
+                            });
+                        
+                        // Handle service worker controller changes
+                        let refreshing = false;
+                        navigator.serviceWorker.addEventListener('controllerchange', () => {
+                            if (!refreshing) {
+                                refreshing = true;
+                                console.log('New service worker activated, reloading page');
+                                window.location.reload();
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
 });

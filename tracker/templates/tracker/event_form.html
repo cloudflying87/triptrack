@@ -6,36 +6,100 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-8 mx-auto">
-        <div class="card form-card">
-            <div class="card-header">
-                <h2 class="card-title">
-                    {% if event %}
-                        Edit {{ event.get_event_type_display }} Record
-                    {% else %}
-                        Add New {{ event_type|title }} Record
-                    {% endif %}
-                </h2>
+  <div class="col-md-8 mx-auto">
+    <div class="card form-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          {% if event %}
+            Edit {{ event.get_event_type_display }} Record
+          {% else %}
+            Add New {{ event_type|title }} Record
+          {% endif %}
+        </h2>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          
+          <!-- Display all form fields except total_cost and notes -->
+          {% for field in form %}
+            {% if field.name != 'total_cost' and field.name != 'notes' %}
+              <div class="mb-3">
+                {{ field|as_crispy_field }}
+              </div>
+            {% endif %}
+          {% endfor %}
+          
+          <!-- Toggle button for additional fields -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="toggle-additional-fields">
+                <i class="bi bi-chevron-down"></i> Show Additional Fields
+              </button>
             </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <a href="{% if event %}{% url 'event_update' event.pk %}{% else %}{% url 'event_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
-                    </div>
-                </form>
-            </div>
-        </div>
+          </div>
+          
+          <!-- Additional fields section (hidden by default) -->
+          <div id="additional-fields" style="display: none;">
+            {% for field in form %}
+              {% if field.name == 'total_cost' or field.name == 'notes' %}
+                <div class="mb-3">
+                  {{ field|as_crispy_field }}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{% if event %}{% url 'vehicle_detail' event.vehicle.pk %}{% else %}{% url 'event_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Dynamic form fields based on vehicle type would be handled here
+document.addEventListener('DOMContentLoaded', function() {
+  // Toggle additional fields
+  const toggleBtn = document.getElementById('toggle-additional-fields');
+  const additionalFields = document.getElementById('additional-fields');
+  
+  if (toggleBtn && additionalFields) {
+    toggleBtn.addEventListener('click', function() {
+      if (additionalFields.style.display === 'none') {
+        additionalFields.style.display = 'block';
+        toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Additional Fields';
+      } else {
+        additionalFields.style.display = 'none';
+        toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i> Show Additional Fields';
+      }
     });
+  }
+  
+  // Auto-calculate total cost for gas events
+  {% if event_type == 'gas' %}
+  const gallonsInput = document.getElementById('id_gallons');
+  const priceInput = document.getElementById('id_price_per_gallon');
+  const totalCostInput = document.getElementById('id_total_cost');
+  
+  if (gallonsInput && priceInput && totalCostInput) {
+    const calculateTotal = function() {
+      const gallons = parseFloat(gallonsInput.value) || 0;
+      const price = parseFloat(priceInput.value) || 0;
+      totalCostInput.value = (gallons * price).toFixed(2);
+    };
+    
+    gallonsInput.addEventListener('input', calculateTotal);
+    priceInput.addEventListener('input', calculateTotal);
+    
+    // Calculate on page load
+    calculateTotal();
+  }
+  {% endif %}
+});
 </script>
 {% endblock %}

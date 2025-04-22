@@ -1,4 +1,3 @@
-# forms.py
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
@@ -144,17 +143,28 @@ class TodoItemForm(forms.ModelForm):
             family_members = User.objects.filter(families__in=user_families).distinct().exclude(id=user.id)
             self.fields['shared_with'].queryset = family_members
 
+
 class LocationForm(forms.ModelForm):
     class Meta:
         model = Location
         fields = ['name', 'address']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
 
 class MaintenanceEventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'vehicle': forms.Select(attrs={'class': 'form-select'}),
+            'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'maintenance_category': forms.Select(attrs={'class': 'form-select'}),
+            'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
+            'hours': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -164,8 +174,10 @@ class MaintenanceEventForm(forms.ModelForm):
         # Set current date as default
         self.fields['date'].initial = date.today()
         
+        # Limit vehicle choices to vehicles in user's families
         if user:
-            self.fields['vehicle'].queryset = Vehicle.objects.filter(owner=user)
+            user_families = user.families.all()
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(family__in=user_families)
 
 
 class MaintenanceScheduleForm(forms.ModelForm):
@@ -180,8 +192,17 @@ class MaintenanceScheduleForm(forms.ModelForm):
             'last_performed', 'last_miles', 'last_hours', 'is_active'
         ]
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-            'last_performed': forms.DateInput(attrs={'type': 'date'}),
+            'vehicle': forms.Select(attrs={'class': 'form-control'}),
+            'maintenance_type': forms.Select(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'interval_miles': forms.NumberInput(attrs={'class': 'form-control'}),
+            'interval_hours': forms.NumberInput(attrs={'class': 'form-control'}),
+            'interval_days': forms.NumberInput(attrs={'class': 'form-control'}),
+            'last_performed': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'last_miles': forms.NumberInput(attrs={'class': 'form-control'}),
+            'last_hours': forms.NumberInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }
         labels = {
             'interval_miles': _('Miles Between Maintenance'),
@@ -203,14 +224,7 @@ class MaintenanceScheduleForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
-        # Add Bootstrap classes
-        for field_name, field in self.fields.items():
-            field.widget.attrs.update({'class': 'form-control'})
             
-        # Special case for checkboxes
-        self.fields['is_active'].widget.attrs.update({'class': 'form-check-input'})
-        
         # Filter vehicles to only those the user has access to
         if user:
             user_families = user.families.all()
@@ -248,12 +262,19 @@ class MaintenanceScheduleForm(forms.ModelForm):
         
         return cleaned_data
     
+
 class GasEventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = ['vehicle', 'date', 'miles', 'gallons', 'price_per_gallon', 'total_cost', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'vehicle': forms.Select(attrs={'class': 'form-select'}),
+            'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
+            'gallons': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'price_per_gallon': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'total_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
         }
 
     def __init__(self, *args, **kwargs):
@@ -263,13 +284,15 @@ class GasEventForm(forms.ModelForm):
         # Set current date as default
         self.fields['date'].initial = date.today()
         
+        # Limit vehicle choices to vehicles in user's families
         if user:
-            self.fields['vehicle'].queryset = Vehicle.objects.filter(owner=user)
+            user_families = user.families.all()
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(family__in=user_families)
             
             # Set initial vehicle to the most recently used one
             try:
                 last_event = Event.objects.filter(
-                    user=user
+                    created_by=user
                 ).order_by('-date', '-created_at').first()
                 
                 if last_event and last_event.vehicle:
@@ -290,12 +313,18 @@ class GasEventForm(forms.ModelForm):
             cleaned_data['total_cost'] = gallons * price_per_gallon
         return cleaned_data
 
+
 class OutingEventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = ['vehicle', 'date', 'location', 'miles', 'hours', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'vehicle': forms.Select(attrs={'class': 'form-select'}),
+            'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'location': forms.Select(attrs={'class': 'form-select'}),
+            'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
+            'hours': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3})
         }
 
     def __init__(self, *args, **kwargs):
@@ -305,13 +334,18 @@ class OutingEventForm(forms.ModelForm):
         # Set current date as default
         self.fields['date'].initial = date.today()
         
+        # Limit vehicle choices to vehicles in user's families
         if user:
-            self.fields['vehicle'].queryset = Vehicle.objects.filter(owner=user)
+            user_families = user.families.all()
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(family__in=user_families)
+            
+            # Limit location choices to those created by the user
+            self.fields['location'].queryset = Location.objects.filter(created_by=user)
             
             # Set initial vehicle to the most recently used one
             try:
                 last_event = Event.objects.filter(
-                    user=user
+                    created_by=user
                 ).order_by('-date', '-created_at').first()
                 
                 if last_event and last_event.vehicle:
@@ -320,10 +354,22 @@ class OutingEventForm(forms.ModelForm):
                 # If there's any error, just continue without a default vehicle
                 pass
 
+
 class UserRegisterForm(UserCreationForm):
     """Extended user registration form with email field"""
-    email = forms.EmailField()
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control'})
+    )
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add Bootstrap classes to the password fields
+        self.fields['password1'].widget.attrs.update({'class': 'form-control'})
+        self.fields['password2'].widget.attrs.update({'class': 'form-control'})

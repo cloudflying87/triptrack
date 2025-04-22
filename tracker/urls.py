@@ -74,9 +74,6 @@ urlpatterns = [
     # Health check
     path('health/', views.health_check, name='health_check'),
     
-    # Service worker
-    path('sw.js', views.service_worker, name='service_worker'),
-    
     # Authentication
     path('accounts/', include('django.contrib.auth.urls')),
     path('accounts/register/', views.register, name='register'),

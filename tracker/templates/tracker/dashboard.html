@@ -4,7 +4,7 @@
 {% block title %}Dashboard - TripTracker{% endblock %}
 
 {% block extra_css %}
-<!-- Chart.js -->
+
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 {% endblock %}
 
@@ -12,6 +12,36 @@
 <div class="row mb-4">
     <div class="col-md-12">
         <h1>Dashboard</h1>
+    </div>
+</div>
+
+<!-- Event Quick Add Section -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Add New Event</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <a href="{% url 'gas_create' %}" class="btn btn-warning btn-lg w-100">
+                            <i class="bi bi-fuel-pump-fill"></i> Gas Fill-up
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{% url 'outing_create' %}" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-geo-alt-fill"></i> Outing
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{% url 'maintenance_create' %}" class="btn btn-danger btn-lg w-100">
+                            <i class="bi bi-tools"></i> Maintenance
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -60,6 +90,84 @@
 </div>
 
 <div class="row">
+    <!-- Recent Events -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Activity</h5>
+                <a href="{% url 'event_list' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-list"></i> View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_events %}
+                    <ul class="list-group list-group-flush">
+                        {% for event in recent_events %}
+                            <li class="list-group-item event-item {{ event.event_type }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ event.get_event_type_display }}</strong> - {{ event.vehicle.name }}
+                                        <p class="mb-0 text-muted">{{ event.date|date:"M d, Y" }}</p>
+                                    </div>
+                                    <div>
+                                        {% if event.event_type == 'gas' and event.total_cost %}
+                                            <span class="badge bg-warning text-dark">${{ event.total_cost|floatformat:2 }}</span>
+                                        {% elif event.event_type == 'maintenance' and event.total_cost %}
+                                            <span class="badge bg-danger">${{ event.total_cost|floatformat:2 }}</span>
+                                        {% endif %}
+                                        <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-secondary">
+                                            Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No recent activity.
+                        <a href="{% url 'event_create' %}" class="alert-link">Add an event</a> to get started.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance Due -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Maintenance Due</h5>
+            </div>
+            <div class="card-body">
+                {% if maintenance_due %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in maintenance_due %}
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0">{{ item.schedule.name }}</h6>
+                                        <small class="text-muted">{{ item.vehicle.name }}</small>
+                                    </div>
+                                    <a href="{% url 'maintenance_create' %}?vehicle={{ item.vehicle.id }}&category={{ item.schedule.maintenance_type.id }}" 
+                                       class="btn btn-sm btn-outline-success">
+                                        Mark Complete
+                                    </a>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> No maintenance is currently due.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
     <!-- Family Overview -->
     <div class="col-md-6 mb-4">
         <div class="card">
@@ -97,51 +205,6 @@
         </div>
     </div>
     
-    <!-- Recent Events -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Recent Activity</h5>
-                <a href="{% url 'event_create' %}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-plus-circle"></i> Add Event
-                </a>
-            </div>
-            <div class="card-body">
-                {% if recent_events %}
-                    <ul class="list-group list-group-flush">
-                        {% for event in recent_events %}
-                            <li class="list-group-item event-item {{ event.event_type }}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ event.get_event_type_display }}</strong> - {{ event.vehicle.name }}
-                                        <p class="mb-0 text-muted">{{ event.date|date:"M d, Y" }}</p>
-                                    </div>
-                                    <div>
-                                        {% if event.event_type == 'gas' and event.total_cost %}
-                                            <span class="badge bg-warning text-dark">${{ event.total_cost|floatformat:2 }}</span>
-                                        {% elif event.event_type == 'maintenance' and event.total_cost %}
-                                            <span class="badge bg-danger">${{ event.total_cost|floatformat:2 }}</span>
-                                        {% endif %}
-                                        <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-secondary">
-                                            Details
-                                        </a>
-                                    </div>
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> No recent activity.
-                        <a href="{% url 'event_create' %}" class="alert-link">Add an event</a> to get started.
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
     <!-- To-Do List -->
     <div class="col-md-6 mb-4">
         <div class="card">
@@ -191,45 +254,12 @@
             </div>
         </div>
     </div>
-    
-    <!-- Maintenance Due -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Maintenance Due</h5>
-            </div>
-            <div class="card-body">
-                {% if maintenance_due %}
-                    <ul class="list-group list-group-flush">
-                        {% for item in maintenance_due %}
-                            <li class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-0">{{ item.schedule.name }}</h6>
-                                        <small class="text-muted">{{ item.vehicle.name }}</small>
-                                    </div>
-                                    <a href="{% url 'event_create' %}?vehicle={{ item.vehicle.id }}&type=maintenance&category={{ item.schedule.maintenance_type.id }}" 
-                                       class="btn btn-sm btn-outline-success">
-                                        Mark Complete
-                                    </a>
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="alert alert-success">
-                        <i class="bi bi-check-circle"></i> No maintenance is currently due.
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js -->
-<script src="{% static 'js/chart.min.js' %}"></script>
+
+
 <script>
     // Add charts initialization if needed
 </script>
