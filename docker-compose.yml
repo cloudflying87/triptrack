@@ -7,7 +7,7 @@ services:
       - ./logs:/app/logs
       - ./static:/app/static
     environment:
-      - DEBUG=0
+      - DEBUG=1
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=tracking.flyhomemnlab.com,localhost,127.0.0.1
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@triptracker_db:5432/${DB_NAME}
@@ -23,7 +23,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    
+
   triptracker_db:
     image: postgres:16
     restart: always
@@ -39,7 +39,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-  
+
   triptracker_redis:
     image: redis:alpine
     restart: always
@@ -50,7 +50,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    
+
   triptracker_tunnel:
     image: cloudflare/cloudflared
     restart: always
