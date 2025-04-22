@@ -11,7 +11,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-dev-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'tracking.flyhomemnlab.com,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'triptrack.flyhomemnlab.com,localhost,127.0.0.1').split(',')
+CSRF_TRUSTED_ORIGINS = ['https://triptrack.flyhomemnlab.com']
 
 # Application definition
 INSTALLED_APPS = [
@@ -128,7 +129,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-CSRF_TRUSTED_ORIGINS = ['https://triptrack.flyhomemnlab.com']
+
 # Login settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
