@@ -20,16 +20,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
+# Add entrypoint script and make it executable
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Collect static files
 RUN python manage.py collectstatic --noinput
+
+# Create a non-root user and change ownership
+RUN useradd -m appuser
+RUN chown -R appuser:appuser /app /entrypoint.sh
+USER appuser
 
 # Expose port
 EXPOSE 8000
 
-# Create a non-root user
-RUN useradd -m appuser
-RUN chown -R appuser:appuser /app
-USER appuser
-
-
+# Run the application
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "vehicle_tracker.wsgi:application"]
