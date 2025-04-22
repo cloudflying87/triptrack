@@ -31,10 +31,5 @@ RUN useradd -m appuser
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Add entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
-# Run the application
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "vehicle_tracker.wsgi:application"]
