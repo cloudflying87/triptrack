@@ -12,10 +12,10 @@ services:
       - DEBUG=0
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=tracking.flyhomemnlab.com,localhost,127.0.0.1
-      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@triptracker_db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@triptracker_db:5432/${DB_NAME}
       - REDIS_URL=redis://triptracker_redis:6379/1
     ports:
-      - "8000:8000"
+      - "8250:8000"
     depends_on:
       - triptracker_db
       - triptracker_redis
@@ -32,11 +32,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5

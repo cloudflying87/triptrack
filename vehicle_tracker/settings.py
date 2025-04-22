@@ -65,15 +65,10 @@ WSGI_APPLICATION = 'vehicle_tracker.wsgi.application'
 
 # Database
 DATABASES = {
-    'default': {
-        
-        'ENGINE': 'django.db.backends.postgresql',
-        'HOST':os.getenv('DB_HOST'),
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'PORT': os.getenv('DB_PORT'),
-    }
+    'default': dj_database_url.config(
+        default=f"postgres://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME')}",
+        conn_max_age=600
+    )
 }
 
 # Caching
