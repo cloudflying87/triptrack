@@ -17,6 +17,13 @@ from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm,
                   OutingEventForm, TodoItemForm, LocationForm, UserRegisterForm,
                   FamilyForm, FamilyMemberForm,MaintenanceScheduleForm)
 
+import logging
+logger = logging.getLogger('tracker')
+
+def landing_page_view(request):
+    logger.debug(f"Request headers: {request.headers}")
+    logger.debug(f"Request META: {request.META}")
+    
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'tracker/dashboard.html'
     login_url = 'login'  # Redirect to login page if not authenticated
