@@ -11,7 +11,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-dev-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'triptrack.flyhomemnlab.com,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = ['triptrack.flyhomemnlab.com,localhost']
 CSRF_TRUSTED_ORIGINS = ['https://triptrack.flyhomemnlab.com']
 
 # Application definition
@@ -45,6 +45,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'vehicle_tracker.urls'
+WHITENOISE_USE_FINDERS = True
 
 TEMPLATES = [
     {
