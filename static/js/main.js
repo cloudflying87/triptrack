@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Show offline indicator
-                    showOfflineIndicator('Todo item will be updated when you're back online');
+                    showOfflineIndicator("Todo item will be updated when you're back online");
                 } else {
                     // Revert checkbox state on error
                     this.checked = !this.checked;
