@@ -125,10 +125,13 @@
                     </div>
                     <div class="col-md-2 col-lg-2">
                         <div class="event-actions">
-                            <a href="{% url 'event_update' event.pk %}" class="btn btn-sm btn-outline-primary mb-2">
+                            <a href="{% url 'event_detail' event.pk %}" class="btn btn-sm btn-outline-secondary mb-2 w-100">
+                                <i class="bi bi-eye"></i> View Details
+                            </a>
+                            <a href="{% url 'event_update' event.pk %}" class="btn btn-sm btn-outline-primary mb-2 w-100">
                                 <i class="bi bi-pencil"></i> Edit
                             </a>
-                            <a href="{% url 'event_delete' event.pk %}" class="btn btn-sm btn-outline-danger">
+                            <a href="{% url 'event_delete' event.pk %}" class="btn btn-sm btn-outline-danger w-100">
                                 <i class="bi bi-trash"></i> Delete
                             </a>
                         </div>

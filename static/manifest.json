@@ -1,22 +1,102 @@
-
 {
-    "name": "TripTracker",
-    "short_name": "TripTracker",
-    "description": "Track vehicle maintenance, trips, and expenses",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#4285f4",
-    "icons": [
-      {
-        "src": "/static/images/icon-192x192.png",
-        "sizes": "192x192",
-        "type": "image/png"
-      },
-      {
-        "src": "/static/images/icon-512x512.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      }
-    ]
-  }
+  "name": "TripTracker",
+  "short_name": "TripTracker",
+  "description": "Track vehicle maintenance, gas fill-ups, outings, and more",
+  "start_url": "/dashboard/",
+  "display": "standalone",
+  "background_color": "#4285f4",
+  "theme_color": "#4285f4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/images/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/maskable-icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/images/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Vehicle",
+      "short_name": "Add Vehicle",
+      "description": "Add a new vehicle",
+      "url": "/vehicles/create/",
+      "icons": [{ "src": "/static/images/vehicle-icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Add Gas Fill-up",
+      "short_name": "Add Gas",
+      "description": "Record a gas fill-up",
+      "url": "/events/gas/create/",
+      "icons": [{ "src": "/static/images/gas-icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Add Maintenance",
+      "short_name": "Add Maintenance",
+      "description": "Record maintenance",
+      "url": "/events/maintenance/create/",
+      "icons": [{ "src": "/static/images/maintenance-icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Add To-Do",
+      "short_name": "Add To-Do",
+      "description": "Add a to-do item",
+      "url": "/todos/create/",
+      "icons": [{ "src": "/static/images/todo-icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/images/screenshot-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "TripTracker Dashboard"
+    },
+    {
+      "src": "/static/images/screenshot-2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Vehicle Details"
+    },
+    {
+      "src": "/static/images/screenshot-mobile-1.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "TripTracker Mobile Dashboard"
+    },
+    {
+      "src": "/static/images/screenshot-mobile-2.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vehicle Details on Mobile"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "scope": "/"
+}

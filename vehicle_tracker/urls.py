@@ -4,8 +4,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.views.generic import RedirectView
-from tracker import views  
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.views.generic import RedirectView,TemplateView
+from tracker.views import service_worker  
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -14,7 +15,9 @@ urlpatterns = [
     # Add these if you want to use Django's built-in auth views with your custom templates
     path('accounts/', include('django.contrib.auth.urls')),
     
-    path('sw.js', views.service_worker, name='service_worker'),
+    path('service-worker.js', service_worker, name='service_worker'),
+    path('offline.html', TemplateView.as_view(template_name='offline.html')),
+    path('manifest.json', RedirectView.as_view(url=staticfiles_storage.url('manifest.json'))),
 ]
 
 # Serve media files in development

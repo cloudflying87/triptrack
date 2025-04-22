@@ -31,9 +31,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Get all vehicles in these families
         vehicles = Vehicle.objects.filter(family__in=user_families)
         
+        # Get all locations in these families
+        locations = Location.objects.filter(family__in=user_families)
+        
         # Get counts for dashboard
         context['family_count'] = user_families.count()
         context['vehicle_count'] = vehicles.count()
+        context['location_count'] = locations.count()  # Added location count
         
         # Get recent events
         context['recent_events'] = Event.objects.filter(
@@ -86,18 +90,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         context['events_by_type'] = events_by_type
         
-        # Get families with their vehicle count
-        families_with_vehicle_count = []
+        # Get families with their vehicle count and location count
+        families_with_counts = []
         for family in user_families:
-            families_with_vehicle_count.append({
+            families_with_counts.append({
                 'family': family,
                 'vehicle_count': family.vehicles.count(),
+                'location_count': family.locations.count(),  # Added location count
                 'member_count': family.members.count(),
             })
             
-        context['families'] = families_with_vehicle_count
+        context['families'] = families_with_counts
         return context
-
+    
 class FamilyMemberRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         # For views with pk in kwargs (for Family objects)
@@ -135,9 +140,9 @@ class FamilyDetailView(LoginRequiredMixin, FamilyMemberRequiredMixin, DetailView
         context = super().get_context_data(**kwargs)
         family = self.get_object()
         context['vehicles'] = family.vehicles.all()
+        context['locations'] = family.locations.all()  # Added locations
         context['members'] = family.members.all()
         return context
-
 
 class FamilyCreateView(LoginRequiredMixin, CreateView):
     model = Family
@@ -442,7 +447,7 @@ class GasCreateView(LoginRequiredMixin, CreateView):
         
         event.save()
         messages.success(self.request, 'Gas fill-up record added successfully!')
-        return redirect('vehicle_detail', pk=event.vehicle.pk)
+        return redirect('event_list')
 
 class OutingCreateView(LoginRequiredMixin, CreateView):
     model = Event
@@ -472,7 +477,7 @@ class OutingCreateView(LoginRequiredMixin, CreateView):
         event.event_type = 'outing'
         event.save()
         messages.success(self.request, 'Outing record added successfully!')
-        return redirect('vehicle_detail', pk=event.vehicle.pk)
+        return redirect('event_list')
 
 class EventUpdateView(LoginRequiredMixin, UpdateView):
     model = Event
@@ -749,7 +754,54 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         user_families = self.request.user.families.all()
         vehicles = Vehicle.objects.filter(family__in=user_families)
         
+        # Get vehicle types and count
+        vehicle_types = {}
+        for vehicle in vehicles:
+            vehicle_type = vehicle.get_type_display()
+            if vehicle_type in vehicle_types:
+                vehicle_types[vehicle_type] += 1
+            else:
+                vehicle_types[vehicle_type] = 1
+        
+        # Get maintenance and gas event counts and costs
+        maintenance_events = Event.objects.filter(
+            vehicle__in=vehicles,
+            event_type='maintenance'
+        )
+        
+        gas_events = Event.objects.filter(
+            vehicle__in=vehicles,
+            event_type='gas'
+        )
+        
+        # Calculate maintenance statistics
+        maintenance_count = maintenance_events.count()
+        maintenance_cost = maintenance_events.aggregate(
+            total=Sum('total_cost')
+        )['total'] or 0
+        
+        # Calculate gas statistics
+        gas_count = gas_events.count()
+        gas_cost = gas_events.aggregate(
+            total=Sum('total_cost')
+        )['total'] or 0
+        
+        # Get due maintenance schedules
+        due_maintenance = []
+        for vehicle in vehicles:
+            for schedule in vehicle.maintenance_schedules.filter(is_active=True):
+                if schedule.is_due():
+                    due_maintenance.append(schedule)
+        
+        # Add all data to context
         context['vehicles'] = vehicles
+        context['vehicle_types'] = vehicle_types
+        context['maintenance_count'] = maintenance_count
+        context['maintenance_cost'] = maintenance_cost
+        context['gas_count'] = gas_count
+        context['gas_cost'] = gas_cost
+        context['due_maintenance'] = due_maintenance
+        
         return context
 
 class VehicleReportView(LoginRequiredMixin, DetailView):
@@ -1136,8 +1188,8 @@ def register(request):
 def service_worker(request):
     """View for service worker script"""
     
-    path = os.path.join(settings.BASE_DIR, 'sw.js')
-    
+    path = os.path.join(settings.BASE_DIR, 'static/service-worker.js')
+    print
     with open(path, 'r') as sw_file:
         content = sw_file.read()
     
