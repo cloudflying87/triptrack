@@ -49,31 +49,40 @@ class FamilyMemberForm(forms.Form):
 
 class VehicleForm(forms.ModelForm):
     """Form for creating and updating Vehicle instances"""
-    
     class Meta:
         model = Vehicle
-        fields = ['name', 'make', 'model', 'year', 'type', 'image', 'family']
+        fields = [
+            'name', 'make', 'model', 'year', 'type', 
+            'starting_mileage', 'vin', 'license_plate',
+            'image', 'family'
+        ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'make': forms.TextInput(attrs={'class': 'form-control'}),
             'model': forms.TextInput(attrs={'class': 'form-control'}),
             'year': forms.NumberInput(attrs={'class': 'form-control'}),
+            'starting_mileage': forms.NumberInput(attrs={'class': 'form-control'}),
+            'vin': forms.TextInput(attrs={'class': 'form-control'}),
+            'license_plate': forms.TextInput(attrs={'class': 'form-control'}),
             'type': forms.Select(attrs={'class': 'form-select'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'family': forms.Select(attrs={'class': 'form-select'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
         # Limit family choices to families the user belongs to
         if user:
             self.fields['family'].queryset = user.families.all()
-            
             # If user is only in one family, preselect it
             if user.families.count() == 1:
                 self.fields['family'].initial = user.families.first()
+        
+        # Add help text for fields
+        self.fields['starting_mileage'].help_text = "Initial odometer reading"
+        self.fields['vin'].help_text = "Vehicle Identification Number"
+        self.fields['license_plate'].help_text = "Registration plate number"
 
 
 class EventForm(forms.ModelForm):
@@ -147,12 +156,27 @@ class TodoItemForm(forms.ModelForm):
 class LocationForm(forms.ModelForm):
     class Meta:
         model = Location
-        fields = ['name', 'address']
+        fields = ['name', 'address', 'latitude', 'longitude', 'family']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'address': forms.TextInput(attrs={'class': 'form-control'}),
+            'latitude': forms.NumberInput(attrs={'step': '0.000001'}),
+            'longitude': forms.NumberInput(attrs={'step': '0.000001'}),
         }
-
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        if user:
+            # Limit family choices to only families the user belongs to
+            self.fields['family'].queryset = user.families.all()
+            
+            # If the user belongs to only one family, select it by default
+            if user.families.count() == 1:
+                self.fields['family'].initial = user.families.first()
+        
+        # Add help text
+        self.fields['latitude'].help_text = 'Decimal degrees (e.g., 37.123456)'
+        self.fields['longitude'].help_text = 'Decimal degrees (e.g., -122.123456)'
 
 class MaintenanceEventForm(forms.ModelForm):
     class Meta:
@@ -283,7 +307,7 @@ class GasEventForm(forms.ModelForm):
         
         # Set current date as default
         self.fields['date'].initial = date.today()
-        
+        self.fields['miles'].help_text = "Current odometer reading at fill-up"
         # Limit vehicle choices to vehicles in user's families
         if user:
             user_families = user.families.all()

@@ -97,41 +97,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-
-    // MPG Chart - Added check for Chart global
-    const mpgChartCanvas = document.getElementById('mpgChart');
-    
-    if (mpgChartCanvas && typeof Chart !== 'undefined') {
-        try {
-            const mpgData = JSON.parse(mpgChartCanvas.dataset.mpgData || '[]');
-            
-            if (mpgData.length > 0) {
-                new Chart(mpgChartCanvas, {
-                    type: 'line',
-                    data: {
-                        labels: mpgData.map(item => item.date),
-                        datasets: [{
-                            label: 'MPG',
-                            data: mpgData.map(item => item.mpg),
-                            borderColor: '#4285f4',
-                            tension: 0.1,
-                            fill: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: {
-                                beginAtZero: false
-                            }
-                        }
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Error creating MPG chart:', error);
-        }
-    }
     
     // Enhanced Service Worker Registration
     if ('serviceWorker' in navigator) {

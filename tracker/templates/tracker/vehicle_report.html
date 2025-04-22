@@ -4,16 +4,14 @@
 
 {% block title %}TripTracker - {{ vehicle.name }} Report{% endblock %}
 
-{% block extra_css %}ß
+{% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>{{ vehicle.name }} Report</h1>
-    <a href="{% url 'export_vehicle_data' vehicle.pk %}" class="btn btn-primary">
-        <i class="bi bi-file-earmark-spreadsheet"></i> Export to CSV
-    </a>
+    <!--  -->
 </div>
 
 <div class="card mb-4">
@@ -113,7 +111,7 @@
                 <h5 class="mb-0">Fuel Efficiency (MPG)</h5>
             </div>
             <div class="card-body">
-                <canvas id="mpgChart" data-mpg-data="{{ mpg_data|safe }}"></canvas>
+                <canvas id="mpgChart" data-mpg-data='{{ mpg_data }}'></canvas>
                 <div class="text-center mt-3">
                     <p>Average MPG: <strong>{{ avg_mpg|floatformat:1 }}</strong></p>
                 </div>
@@ -291,61 +289,81 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // MPG Chart
         const mpgChartCanvas = document.getElementById('mpgChart');
         if (mpgChartCanvas) {
-            const mpgData = JSON.parse(mpgChartCanvas.dataset.mpgData || '[]');
-            
-            if (mpgData.length > 0) {
-                new Chart(mpgChartCanvas, {
-                    type: 'line',
-                    data: {
-                        labels: mpgData.map(item => item.date),
-                        datasets: [{
-                            label: 'MPG',
-                            data: mpgData.map(item => item.mpg),
-                            borderColor: '#4285f4',
-                            tension: 0.1,
-                            fill: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: {
-                                beginAtZero: false
+            try {
+                // Fix JSON parsing by properly formatting the JSON data
+                const mpgDataString = mpgChartCanvas.getAttribute('data-mpg-data');
+                
+                let mpgData = [];
+                try {
+                    mpgData = JSON.parse(mpgDataString || '[]');
+                } catch (e) {
+                    console.error("Error parsing MPG data:", e);
+                    // If JSON parsing fails, try to use the data directly
+                    mpgData = {{ mpg_data|default:'[]'|safe }};
+                }
+                
+                if (mpgData.length > 0) {
+                    new Chart(mpgChartCanvas, {
+                        type: 'line',
+                        data: {
+                            labels: mpgData.map(item => item.date),
+                            datasets: [{
+                                label: 'MPG',
+                                data: mpgData.map(item => item.mpg),
+                                borderColor: '#4285f4',
+                                tension: 0.1,
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
+            } catch (error) {
+                console.error("Error creating MPG chart:", error);
             }
         }
         
-        // DateRangePicker
-        $('#daterange').daterangepicker({
-            opens: 'left',
-            autoUpdateInput: false,
-            locale: {
-                cancelLabel: 'Clear'
-            }
-        });
-        
-        $('#daterange').on('apply.daterangepicker', function(ev, picker) {
-            $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-            $('#start_date').val(picker.startDate.format('YYYY-MM-DD'));
-            $('#end_date').val(picker.endDate.format('YYYY-MM-DD'));
-        });
-        
-        $('#daterange').on('cancel.daterangepicker', function(ev, picker) {
-            $(this).val('');
-            $('#start_date').val('');
-            $('#end_date').val('');
-        });
+        // Make sure jQuery is available before initializing daterangepicker
+        if (typeof jQuery !== 'undefined') {
+            // DateRangePicker
+            $('#daterange').daterangepicker({
+                opens: 'left',
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear'
+                }
+            });
+            
+            $('#daterange').on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+                $('#start_date').val(picker.startDate.format('YYYY-MM-DD'));
+                $('#end_date').val(picker.endDate.format('YYYY-MM-DD'));
+            });
+            
+            $('#daterange').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+                $('#start_date').val('');
+                $('#end_date').val('');
+            });
+        } else {
+            console.error("jQuery is not loaded. DateRangePicker requires jQuery.");
+        }
     });
 </script>
 {% endblock %}

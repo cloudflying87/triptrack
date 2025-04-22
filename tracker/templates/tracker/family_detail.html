@@ -3,133 +3,122 @@
 {% block title %}{{ family.name }} - TripTracker{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row">
     <div class="col-md-8">
         <h1>{{ family.name }}</h1>
-        <p class="text-muted">Created by {{ family.created_by.username }} on {{ family.created_at|date:"M d, Y" }}</p>
+        <p>
+            <small class="text-muted">Created by {{ family.created_by.username }}</small>
+        </p>
     </div>
     <div class="col-md-4 text-end">
-        {% if user == family.created_by %}
-            <a href="{% url 'family_update' family.id %}" class="btn btn-outline-primary">
+        <div class="btn-group">
+            <a href="{% url 'family_update' family.pk %}" class="btn btn-outline-primary">
                 <i class="bi bi-pencil"></i> Edit
             </a>
-            <a href="{% url 'family_delete' family.id %}" class="btn btn-outline-danger">
+            <a href="{% url 'family_delete' family.pk %}" class="btn btn-outline-danger">
                 <i class="bi bi-trash"></i> Delete
             </a>
-        {% endif %}
+        </div>
     </div>
 </div>
 
-<div class="row">
-    <!-- Family Members -->
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Family Members</h5>
-                {% if user == family.created_by %}
-                    <a href="{% url 'family_member_add' family.id %}" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-person-plus"></i> Add
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Family Members</h5>
+                    <a href="{% url 'family_member_add' family.pk %}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-person-plus"></i> Add Member
                     </a>
-                {% endif %}
+                </div>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for member in members %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ member.username }}
+                    {% if member == family.created_by %}
+                    <span class="badge bg-primary">Creator</span>
+                    {% else %}
+                    <a href="{% url 'family_member_remove' family.pk member.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-person-x"></i> Remove
+                    </a>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="list-group-item">No members in this family yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Statistics</h5>
+                </div>
             </div>
             <div class="card-body">
-                {% if members %}
-                    <ul class="list-group list-group-flush">
-                        {% for member in members %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ member.username }}
-                                {% if member == family.created_by %}
-                                    <span class="badge bg-primary">Creator</span>
-                                {% elif user == family.created_by and member != user %}
-                                    <a href="{% url 'family_member_remove' family.id member.id %}" 
-                                       class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-person-x"></i>
-                                    </a>
-                                {% endif %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-center text-muted">No members found</p>
-                {% endif %}
+                <p><strong>Total Vehicles:</strong> {{ vehicles.count }}</p>
+                <p><strong>Total Locations:</strong> {{ locations.count }}</p>
+                <p><strong>Total Members:</strong> {{ members.count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Vehicles</h5>
+                    <a href="{% url 'vehicle_create' %}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> Add Vehicle
+                    </a>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for vehicle in vehicles %}
+                <a href="{% url 'vehicle_detail' vehicle.pk %}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">{{ vehicle.name }}</h5>
+                        <small>{{ vehicle.get_type_display }}</small>
+                    </div>
+                    <p class="mb-1">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
+                </a>
+                {% empty %}
+                <div class="list-group-item">No vehicles in this family yet.</div>
+                {% endfor %}
             </div>
         </div>
     </div>
     
-    <!-- Vehicles -->
-    <div class="col-md-8 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Vehicles</h5>
-                <a href="{% url 'vehicle_create' %}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-plus-circle"></i> Add Vehicle
-                </a>
-            </div>
-            <div class="card-body">
-                {% if vehicles %}
-                    <div class="row">
-                        {% for vehicle in vehicles %}
-                            <div class="col-md-6 mb-3">
-                                <div class="card vehicle-card h-100">
-                                    {% if vehicle.image %}
-                                        <img src="{{ vehicle.image.url }}" alt="{{ vehicle }}" class="card-img-top">
-                                    {% else %}
-                                        <div class="bg-light text-center p-4">
-                                            <i class="bi bi-car-front display-1 text-muted"></i>
-                                        </div>
-                                    {% endif %}
-                                    <div class="card-body">
-                                        <h5 class="card-title">{{ vehicle.name }}</h5>
-                                        <p class="card-text">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
-                                        <p class="card-text">
-                                            <small class="text-muted">{{ vehicle.get_type_display }}</small>
-                                        </p>
-                                        <a href="{% url 'vehicle_detail' vehicle.id %}" class="btn btn-sm btn-outline-primary">
-                                            View Details
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> No vehicles found for this family.
-                        <a href="{% url 'vehicle_create' %}" class="alert-link">Add a vehicle</a> to get started.
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Activity -->
-<div class="row">
-    <div class="col-12 mb-4">
-        <div class="card">
+    <div class="col-md-6">
+        <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Recent Activity</h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Locations</h5>
+                    <a href="{% url 'location_create' %}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> Add Location
+                    </a>
+                </div>
             </div>
-            <div class="card-body">
-                {% if recent_events %}
-                    <ul class="list-group list-group-flush">
-                        {% for event in recent_events %}
-                            <li class="list-group-item event-item {{ event.event_type }}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ event.get_event_type_display }}</strong> - {{ event.vehicle.name }}
-                                        <p class="mb-0 text-muted">{{ event.date|date:"M d, Y" }}</p>
-                                    </div>
-                                    <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-secondary">
-                                        Details
-                                    </a>
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-center text-muted">No recent activity</p>
-                {% endif %}
+            <div class="list-group list-group-flush">
+                {% for location in locations %}
+                <a href="{% url 'location_detail' location.pk %}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">{{ location.name }}</h5>
+                        <small>Added by {{ location.created_by.username }}</small>
+                    </div>
+                    {% if location.address %}
+                    <p class="mb-1">{{ location.address }}</p>
+                    {% endif %}
+                </a>
+                {% empty %}
+                <div class="list-group-item">No locations in this family yet.</div>
+                {% endfor %}
             </div>
         </div>
     </div>

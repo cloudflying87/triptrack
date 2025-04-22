@@ -102,22 +102,20 @@ class FamilyMemberRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         # For views with pk in kwargs (for Family objects)
         if 'pk' in self.kwargs:
-            family_id = self.kwargs.get('pk')
-            return self.request.user.families.filter(id=family_id).exists()
-        
-        # For views with family_id in kwargs (for other objects)
+            obj = self.get_object()
+            if hasattr(obj, 'family'):
+                # For Vehicle objects
+                return self.request.user.families.filter(id=obj.family.id).exists()
+            elif isinstance(obj, Family):
+                # For Family objects
+                return self.request.user.families.filter(id=obj.id).exists()
+            
+        # For views with family_id in kwargs
         if 'family_id' in self.kwargs:
             family_id = self.kwargs.get('family_id')
             return self.request.user.families.filter(id=family_id).exists()
-        
-        # For views with object that has family attribute
-        if hasattr(self, 'get_object'):
-            obj = self.get_object()
-            if hasattr(obj, 'family'):
-                return self.request.user.families.filter(id=obj.family.id).exists()
-        
+            
         return False
-
 
 # Family Views
 class FamilyListView(LoginRequiredMixin, ListView):
@@ -296,17 +294,15 @@ class VehicleDetailView(LoginRequiredMixin, FamilyMemberRequiredMixin, DetailVie
         context['todo_items'] = vehicle.todo_items.filter(completed=False)
         return context
 
-
 class VehicleCreateView(LoginRequiredMixin, CreateView):
     model = Vehicle
-    fields = ['name', 'make', 'model', 'year', 'type', 'image', 'family']
+    form_class = VehicleForm
     template_name = 'tracker/vehicle_form.html'
     
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Limit family choices to only families the user belongs to
-        form.fields['family'].queryset = self.request.user.families.all()
-        return form
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -314,19 +310,18 @@ class VehicleCreateView(LoginRequiredMixin, CreateView):
         return response
     
     def get_success_url(self):
-        return reverse_lazy('vehicle_detail', kwargs={'pk': self.object.pk})
-
+        # Redirect to the vehicle list to avoid permission issues
+        return reverse_lazy('vehicle_list')
 
 class VehicleUpdateView(LoginRequiredMixin, FamilyMemberRequiredMixin, UpdateView):
     model = Vehicle
-    fields = ['name', 'make', 'model', 'year', 'type', 'image', 'family']
+    form_class = VehicleForm
     template_name = 'tracker/vehicle_form.html'
     
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Limit family choices to only families the user belongs to
-        form.fields['family'].queryset = self.request.user.families.all()
-        return form
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -335,7 +330,6 @@ class VehicleUpdateView(LoginRequiredMixin, FamilyMemberRequiredMixin, UpdateVie
     
     def get_success_url(self):
         return reverse_lazy('vehicle_detail', kwargs={'pk': self.object.pk})
-
 
 class VehicleDeleteView(LoginRequiredMixin, FamilyMemberRequiredMixin, DeleteView):
     model = Vehicle
@@ -668,11 +662,9 @@ class LocationListView(LoginRequiredMixin, ListView):
     template_name = 'tracker/location_list.html'
     
     def get_queryset(self):
-        locations = Location.objects.filter(created_by=self.request.user)
-        print(f"User {self.request.user.username} has {locations.count()} locations.")
-        print(f"Found {locations.count()} locations for user {self.request.user.username}")
-        print(f"Locations: {list(locations.values('id', 'name'))}")
-        return locations
+        # Get all locations in families the user belongs to
+        user_families = self.request.user.families.all()
+        return Location.objects.filter(family__in=user_families)
 
 class LocationDetailView(LoginRequiredMixin, DetailView):
     model = Location
@@ -680,7 +672,9 @@ class LocationDetailView(LoginRequiredMixin, DetailView):
     template_name = 'tracker/location_detail.html'
     
     def get_queryset(self):
-        return Location.objects.filter(created_by=self.request.user)
+        # Get all locations in families the user belongs to
+        user_families = self.request.user.families.all()
+        return Location.objects.filter(family__in=user_families)
 
 class LocationCreateView(LoginRequiredMixin, CreateView):
     model = Location
@@ -688,11 +682,15 @@ class LocationCreateView(LoginRequiredMixin, CreateView):
     template_name = 'tracker/location_form.html'
     success_url = reverse_lazy('location_list')
     
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Limit family choices to only families the user belongs to
+        form.fields['family'].queryset = self.request.user.families.all()
+        return form
+    
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        print(f"About to save location: {form.cleaned_data}")
         response = super().form_valid(form)
-        print(f"Location saved with ID: {self.object.id}")
         messages.success(self.request, 'Location added successfully!')
         return response
 
@@ -703,13 +701,33 @@ class LocationUpdateView(LoginRequiredMixin, UpdateView):
     success_url = reverse_lazy('location_list')
     
     def get_queryset(self):
-        return Location.objects.filter(created_by=self.request.user)
+        # Get all locations in families the user belongs to
+        user_families = self.request.user.families.all()
+        return Location.objects.filter(family__in=user_families)
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Limit family choices to only families the user belongs to
+        form.fields['family'].queryset = self.request.user.families.all()
+        return form
     
     def form_valid(self, form):
         messages.success(self.request, 'Location updated successfully!')
         return super().form_valid(form)
 
 class LocationDeleteView(LoginRequiredMixin, DeleteView):
+    model = Location
+    template_name = 'tracker/location_confirm_delete.html'
+    success_url = reverse_lazy('location_list')
+    
+    def get_queryset(self):
+        # Get all locations in families the user belongs to
+        user_families = self.request.user.families.all()
+        return Location.objects.filter(family__in=user_families)
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Location deleted successfully!')
+        return super().delete(request, *args, **kwargs)
     model = Location
     template_name = 'tracker/location_confirm_delete.html'
     success_url = reverse_lazy('location_list')
@@ -767,11 +785,16 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         # Calculate MPG
         mpg_data = []
         for event in gas_events.order_by('date'):
-            if event.get_mpg():
+            mpg = event.get_mpg()
+            if mpg:
                 mpg_data.append({
                     'date': event.date.strftime('%Y-%m-%d'),
-                    'mpg': event.get_mpg(),
+                    'mpg': float(mpg),  # Convert to float to ensure JSON serialization
                 })
+        
+        # Convert mpg_data to a JSON string
+        import json
+        mpg_data_json = json.dumps(mpg_data)
         
         # Calculate average MPG
         if mpg_data:
@@ -785,8 +808,9 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             'outing_events': outing_events,
             'total_maintenance_cost': total_maintenance_cost,
             'total_gas_cost': total_gas_cost,
+            'total_cost': total_maintenance_cost + total_gas_cost,
             'avg_mpg': avg_mpg,
-            'mpg_data': mpg_data,
+            'mpg_data': mpg_data_json,  # Now a properly formatted JSON string
             'start_date': start_date,
             'end_date': end_date,
         })
@@ -1055,7 +1079,6 @@ class VehicleFuelEfficiencyApiView(LoginRequiredMixin, View):
         gas_events = Event.objects.filter(
             vehicle=vehicle,
             event_type='gas',
-            miles__isnull=False,
             gallons__isnull=False
         ).order_by('date')
         

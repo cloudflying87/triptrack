@@ -34,23 +34,25 @@
                         <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{% url 'event_list' %}">Events</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'reports' %}">Reports</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'todo_list' %}">To-Do List</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{% url 'family_list' %}">Families</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'vehicle_list' %}">Vehicles</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'event_list' %}">Events</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{% url 'location_list' %}">Locations</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'todo_list' %}">To-Do List</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'reports' %}">Reports</a>
-                    </li>
+                    
+                    
                 </ul>
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
@@ -92,10 +94,10 @@
     </div>
 
     <!-- JavaScript -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
     <script src="{% static 'js/main.js' %}"></script>
-    <script src="{% static 'js/charts.js' %}"></script>
+    
     
     {% block extra_js %}{% endblock %}
 </body>

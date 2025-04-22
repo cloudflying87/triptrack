@@ -66,18 +66,19 @@ class Vehicle(models.Model):
             return latest_event.hours
         return 0
 
-
 class Location(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=200, blank=True, null=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='locations')
+    # Replace created_by with family
+    family = models.ForeignKey('Family', on_delete=models.CASCADE, related_name='locations')
+    # Keep created_by for tracking who created it
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_locations')
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
         return self.name
-
 
 class MaintenanceCategory(models.Model):
     name = models.CharField(max_length=100)
@@ -88,7 +89,6 @@ class MaintenanceCategory(models.Model):
     
     class Meta:
         verbose_name_plural = "Maintenance Categories"
-
 
 class Event(models.Model):
     """Model for tracking maintenance, gas, and outings"""
@@ -136,6 +136,31 @@ class Event(models.Model):
         if self.gallons and self.price_per_gallon and not self.total_cost:
             self.total_cost = self.gallons * self.price_per_gallon
         
+        # Calculate MPG for gas fill-ups
+        if self.event_type == 'gas' and self.gallons and self.miles and self.gallons > 0:
+            # Get the previous gas event for this vehicle
+            prev_event = Event.objects.filter(
+                vehicle=self.vehicle,
+                event_type='gas',
+                date__lt=self.date  # Events before this one
+            ).order_by('-date').first()
+            
+            # Calculate distance driven
+            if prev_event and prev_event.miles:
+                # Miles driven since last fill-up
+                miles_driven = self.miles - prev_event.miles
+            else:
+                # If no previous gas event, use starting_mileage if available
+                if self.vehicle.starting_mileage:
+                    miles_driven = self.miles - self.vehicle.starting_mileage
+                else:
+                    # Fallback to current miles value if we can't calculate difference
+                    miles_driven = self.miles
+            
+            # Calculate MPG
+            if miles_driven > 0:
+                self.milespergallon = round(miles_driven / self.gallons, 2)
+        
         # Check for maintenance schedules to mark as completed
         if self.event_type == 'maintenance' and self.maintenance_category:
             try:
@@ -161,8 +186,13 @@ class Event(models.Model):
         super().save(*args, **kwargs)
     
     def get_mpg(self):
-        if self.event_type == 'gas' and self.miles and self.gallons:
-            return round(self.miles / self.gallons, 2)
+        if self.event_type == 'gas' and self.gallons and self.gallons > 0:
+            # If we have the calculated MPG field, use it
+            if self.milespergallon:
+                return self.milespergallon
+            # Otherwise, we can't calculate it (fallback to simple calculation)
+            elif self.miles:
+                return round(self.miles / self.gallons, 2)
         return None
     
     class Meta:

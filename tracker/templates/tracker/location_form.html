@@ -1,23 +1,53 @@
-<!-- tracker/templates/tracker/location_form.html -->
 {% extends 'tracker/base.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}TripTracker - {% if location %}Edit {{ location.name }}{% else %}Add Location{% endif %}{% endblock %}
+{% block title %}
+{% if form.instance.pk %}Edit Location{% else %}Add Location{% endif %} - TripTracker
+{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-8 mx-auto">
         <div class="card form-card">
             <div class="card-header">
-                <h2 class="card-title">{% if location %}Edit {{ location.name }}{% else %}Add New Location{% endif %}</h2>
+                <h2>{% if form.instance.pk %}Edit Location{% else %}Add New Location{% endif %}</h2>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
-                    {{ form|crispy }}
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <a href="{% url 'location_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            {{ form.name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            {{ form.address|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.latitude|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.longitude|as_crispy_field }}
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            {{ form.family|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Location
+                            </button>
+                            {% if form.instance.pk %}
+                            <a href="{% url 'location_delete' form.instance.pk %}" class="btn btn-outline-danger float-end">
+                                <i class="bi bi-trash"></i> Delete
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'location_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
                     </div>
                 </form>
             </div>
