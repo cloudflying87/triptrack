@@ -1,0 +1,32 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}Remove Family Member - TripTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h2>Remove Family Member</h2>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    Are you sure you want to remove <strong>{{ member.username }}</strong> 
+                    from the <strong>{{ family.name }}</strong> family?
+                </p>
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    This user will lose access to all vehicles and data in this family.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                        <a href="{% url 'family_detail' family.id %}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Remove Member</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

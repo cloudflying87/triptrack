@@ -1,0 +1,38 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}Delete Family - TripTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h2>Delete Family</h2>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    Are you sure you want to delete the <strong>{{ family.name }}</strong> family?
+                </p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This will permanently delete:
+                    <ul>
+                        <li>All vehicles associated with this family</li>
+                        <li>All maintenance records, gas fill-ups, and outings for these vehicles</li>
+                        <li>All to-do items associated with these vehicles</li>
+                        <li>All maintenance schedules</li>
+                    </ul>
+                    <p class="mb-0"><strong>This action cannot be undone!</strong></p>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                        <a href="{% url 'family_detail' family.id %}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Delete Family</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

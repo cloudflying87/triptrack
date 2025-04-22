@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js')  // Updated path to match static files location
+        navigator.serviceWorker.register('/sw.js')  
             .then(reg => console.log('Service Worker registered', reg))
             .catch(err => console.log('Service Worker registration failed', err));
     }

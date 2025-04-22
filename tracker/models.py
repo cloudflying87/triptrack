@@ -8,6 +8,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class Family(models.Model):
+    name = models.CharField(max_length=100)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_families')
+    members = models.ManyToManyField(User, related_name='families')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+        
+    class Meta:
+        verbose_name_plural = "Families"
+
 class Vehicle(models.Model):
     TYPE_CHOICES = [
         ('car', 'Car (miles)'),
@@ -15,7 +27,8 @@ class Vehicle(models.Model):
         ('other', 'Other'),
     ]
     
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vehicles')
+    # Changed from owner to family
+    family = models.ForeignKey(Family, on_delete=models.CASCADE, related_name='vehicles')
     name = models.CharField(max_length=100)
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
@@ -74,15 +87,17 @@ class MaintenanceCategory(models.Model):
 
 
 class Event(models.Model):
-    """Renamed from Event to better match the TripTracker name"""
+    """Model for tracking maintenance, gas, and outings"""
     EVENT_TYPES = [
         ('maintenance', 'Maintenance'),
         ('gas', 'Gas Fill-up'),
         ('outing', 'Outing'),
     ]
     
-    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='trips')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trips')
+    # Keep the vehicle relationship the same but fixed related_name
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='events')
+    # Changed from user to created_by
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_events')
     event_type = models.CharField(max_length=15, choices=EVENT_TYPES)
     date = models.DateField()
     notes = models.TextField(blank=True, null=True)
@@ -109,7 +124,7 @@ class Event(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"{self.get_trip_type_display()} - {self.vehicle} - {self.date}"
+        return f"{self.get_event_type_display()} - {self.vehicle} - {self.date}"
 
     def save(self, *args, **kwargs):
         # Calculate total cost if gallons and price_per_gallon are provided
@@ -149,12 +164,13 @@ class Event(models.Model):
         indexes = [
             models.Index(fields=['vehicle', 'date']),
             models.Index(fields=['event_type']),
-            models.Index(fields=['user', 'date']),
+            models.Index(fields=['created_by', 'date']),  # Changed from user to created_by
         ]
 
 
 class TodoItem(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='todo_items')
+    # Changed from user to created_by
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_todo_items')
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='todo_items', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
@@ -167,7 +183,7 @@ class TodoItem(models.Model):
     class Meta:
         ordering = ['completed', '-priority', 'due_date', 'created_at']
         indexes = [
-            models.Index(fields=['user', 'completed']),
+            models.Index(fields=['created_by', 'completed']),  # Changed from user to created_by
             models.Index(fields=['vehicle', 'completed']),
         ]
     

@@ -1,383 +1,1055 @@
-# views.py
-
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LogoutView
+from django.contrib.auth.models import User
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView, View
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.views.generic.edit import FormView
 from django.contrib import messages
 from django.db.models import Sum, Count, Avg, F, Q
 from datetime import datetime, timedelta
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.urls import reverse_lazy
+from django.utils import timezone
 
-from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory
+from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory, MaintenanceSchedule, Family
 from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm, 
-                  OutingEventForm, TodoItemForm, LocationForm,UserRegisterForm)
-from django.contrib.auth.models import User
+                  OutingEventForm, TodoItemForm, LocationForm, UserRegisterForm,
+                  FamilyForm, FamilyMemberForm,MaintenanceScheduleForm)
 
-# API Views for mobile access
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .serializers import (
-    VehicleSerializer, EventSerializer, MaintenanceScheduleSerializer, 
-    TodoItemSerializer, LocationSerializer
-)
-
-@login_required
-def dashboard(request):
-    vehicles = Vehicle.objects.filter(owner=request.user)
+class DashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'tracker/dashboard.html'
+    login_url = 'login'  # Redirect to login page if not authenticated
     
-    # Recent events
-    recent_events = Event.objects.filter(
-        user=request.user
-    ).order_by('-date')[:5]
-    
-    # Todos
-    todos = TodoItem.objects.filter(
-        Q(user=request.user) | Q(shared_with=request.user)
-    ).distinct().order_by('completed', '-created_at')[:5]
-    
-    context = {
-        'vehicles': vehicles,
-        'recent_events': recent_events,
-        'todos': todos,
-    }
-    return render(request, 'tracker/dashboard.html', context)
-
-# Vehicle views
-@login_required
-def vehicle_list(request):
-    vehicles = Vehicle.objects.filter(owner=request.user)
-    return render(request, 'tracker/vehicle_list.html', {'vehicles': vehicles})
-
-@login_required
-def vehicle_detail(request, pk):
-    vehicle = get_object_or_404(Vehicle, pk=pk, owner=request.user)
-    events = Event.objects.filter(vehicle=vehicle).order_by('-date')
-    todos = TodoItem.objects.filter(vehicle=vehicle).order_by('completed', '-created_at')
-    
-    # Calculate stats
-    maintenance_count = events.filter(event_type='maintenance').count()
-    gas_events = events.filter(event_type='gas')
-    total_spent_on_gas = gas_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
-    
-    # MPG calculation
-    mpg_data = []
-    for event in gas_events.order_by('date'):
-        if event.get_mpg():
-            mpg_data.append({
-                'date': event.date.strftime('%Y-%m-%d'),
-                'mpg': event.get_mpg(),
-            })
-    
-    context = {
-        'vehicle': vehicle,
-        'events': events,
-        'todos': todos,
-        'maintenance_count': maintenance_count,
-        'total_spent_on_gas': total_spent_on_gas,
-        'mpg_data': mpg_data,
-    }
-    return render(request, 'tracker/vehicle_detail.html', context)
-
-@login_required
-def vehicle_create(request):
-    if request.method == 'POST':
-        form = VehicleForm(request.POST, request.FILES)
-        if form.is_valid():
-            vehicle = form.save(commit=False)
-            vehicle.owner = request.user
-            vehicle.save()
-            messages.success(request, 'Vehicle added successfully!')
-            return redirect('vehicle_detail', pk=vehicle.pk)
-    else:
-        form = VehicleForm()
-    
-    return render(request, 'tracker/vehicle_form.html', {'form': form})
-
-@login_required
-def vehicle_update(request, pk):
-    vehicle = get_object_or_404(Vehicle, pk=pk, owner=request.user)
-    
-    if request.method == 'POST':
-        form = VehicleForm(request.POST, request.FILES, instance=vehicle)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Vehicle updated successfully!')
-            return redirect('vehicle_detail', pk=vehicle.pk)
-    else:
-        form = VehicleForm(instance=vehicle)
-    
-    return render(request, 'tracker/vehicle_form.html', {'form': form, 'vehicle': vehicle})
-
-@login_required
-def vehicle_delete(request, pk):
-    vehicle = get_object_or_404(Vehicle, pk=pk, owner=request.user)
-    
-    if request.method == 'POST':
-        vehicle.delete()
-        messages.success(request, 'Vehicle deleted successfully!')
-        return redirect('vehicle_list')
-    
-    return render(request, 'tracker/vehicle_confirm_delete.html', {'vehicle': vehicle})
-
-# Event views
-@login_required
-def event_list(request):
-    events = Event.objects.filter(user=request.user).order_by('-date')
-    return render(request, 'tracker/event_list.html', {'events': events})
-
-@login_required
-def maintenance_create(request):
-    if request.method == 'POST':
-        form = MaintenanceEventForm(request.POST, user=request.user)
-        if form.is_valid():
-            event = form.save(commit=False)
-            event.user = request.user
-            event.event_type = 'maintenance'
-            event.save()
-            messages.success(request, 'Maintenance record added successfully!')
-            return redirect('vehicle_detail', pk=event.vehicle.pk)
-    else:
-        vehicle_id = request.GET.get('vehicle')
-        initial = {}
-        if vehicle_id:
-            initial['vehicle'] = vehicle_id
-        form = MaintenanceEventForm(user=request.user, initial=initial)
-    
-    context = {
-        'form': form,
-        'event_type': 'maintenance',
-    }
-    return render(request, 'tracker/event_form.html', context)
-
-@login_required
-def gas_create(request):
-    if request.method == 'POST':
-        form = GasEventForm(request.POST, user=request.user)
-        if form.is_valid():
-            event = form.save(commit=False)
-            event.user = request.user
-            event.event_type = 'gas'
-            event.save()
-            messages.success(request, 'Gas fill-up record added successfully!')
-            return redirect('vehicle_detail', pk=event.vehicle.pk)
-    else:
-        vehicle_id = request.GET.get('vehicle')
-        initial = {}
-        if vehicle_id:
-            initial['vehicle'] = vehicle_id
-        form = GasEventForm(user=request.user, initial=initial)
-    
-    context = {
-        'form': form,
-        'event_type': 'gas',
-    }
-    return render(request, 'tracker/event_form.html', context)
-
-@login_required
-def outing_create(request):
-    if request.method == 'POST':
-        form = OutingEventForm(request.POST, user=request.user)
-        if form.is_valid():
-            event = form.save(commit=False)
-            event.user = request.user
-            event.event_type = 'outing'
-            event.save()
-            messages.success(request, 'Outing record added successfully!')
-            return redirect('vehicle_detail', pk=event.vehicle.pk)
-    else:
-        vehicle_id = request.GET.get('vehicle')
-        initial = {}
-        if vehicle_id:
-            initial['vehicle'] = vehicle_id
-        form = OutingEventForm(user=request.user, initial=initial)
-    
-    context = {
-        'form': form,
-        'event_type': 'outing',
-    }
-    return render(request, 'tracker/event_form.html', context)
-
-@login_required
-def event_update(request, pk):
-    event = get_object_or_404(Event, pk=pk, user=request.user)
-    
-    if request.method == 'POST':
-        if event.event_type == 'maintenance':
-            form = MaintenanceEventForm(request.POST, instance=event, user=request.user)
-        elif event.event_type == 'gas':
-            form = GasEventForm(request.POST, instance=event, user=request.user)
-        else:  # outing
-            form = OutingEventForm(request.POST, instance=event, user=request.user)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
         
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'{event.event_type.title()} record updated successfully!')
-            return redirect('vehicle_detail', pk=event.vehicle.pk)
-    else:
-        if event.event_type == 'maintenance':
-            form = MaintenanceEventForm(instance=event, user=request.user)
-        elif event.event_type == 'gas':
-            form = GasEventForm(instance=event, user=request.user)
-        else:  # outing
-            form = OutingEventForm(instance=event, user=request.user)
-    
-    context = {
-        'form': form,
-        'event': event,
-        'event_type': event.event_type,
-    }
-    return render(request, 'tracker/event_form.html', context)
+        # Get all families the user belongs to
+        user_families = user.families.all()
+        
+        # Get all vehicles in these families
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        
+        # Get counts for dashboard
+        context['family_count'] = user_families.count()
+        context['vehicle_count'] = vehicles.count()
+        
+        # Get recent events
+        context['recent_events'] = Event.objects.filter(
+            vehicle__in=vehicles
+        ).order_by('-date')[:5]
+        
+        # Get upcoming to-do items
+        context['todo_items'] = TodoItem.objects.filter(
+            Q(vehicle__in=vehicles) | Q(shared_with=user),
+            completed=False
+        ).order_by('due_date')[:5]
+        
+        # Get maintenance due
+        maintenance_due = []
+        for vehicle in vehicles:
+            for schedule in vehicle.maintenance_schedules.filter(is_active=True):
+                if schedule.is_due():
+                    maintenance_due.append({
+                        'vehicle': vehicle,
+                        'schedule': schedule,
+                    })
+        
+        context['maintenance_due'] = maintenance_due[:5]
+        
+        # Get statistics for the last 30 days
+        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+        
+        # Total maintenance cost in last 30 days
+        maintenance_cost = Event.objects.filter(
+            vehicle__in=vehicles,
+            event_type='maintenance',
+            date__gte=thirty_days_ago
+        ).aggregate(total=Sum('total_cost'))['total'] or 0
+        
+        # Total gas cost in last 30 days
+        gas_cost = Event.objects.filter(
+            vehicle__in=vehicles,
+            event_type='gas',
+            date__gte=thirty_days_ago
+        ).aggregate(total=Sum('total_cost'))['total'] or 0
+        
+        context['maintenance_cost'] = maintenance_cost
+        context['gas_cost'] = gas_cost
+        context['total_cost'] = maintenance_cost + gas_cost
+        
+        # Get events by type for pie chart
+        events_by_type = Event.objects.filter(
+            vehicle__in=vehicles
+        ).values('event_type').annotate(count=Count('id')).order_by('-count')
+        
+        context['events_by_type'] = events_by_type
+        
+        # Get families with their vehicle count
+        families_with_vehicle_count = []
+        for family in user_families:
+            families_with_vehicle_count.append({
+                'family': family,
+                'vehicle_count': family.vehicles.count(),
+                'member_count': family.members.count(),
+            })
+            
+        context['families'] = families_with_vehicle_count
+        return context
 
-@login_required
-def event_delete(request, pk):
-    event = get_object_or_404(Event, pk=pk, user=request.user)
-    vehicle_pk = event.vehicle.pk
+class FamilyMemberRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        # For views with family_id in kwargs
+        if 'family_id' in self.kwargs:
+            family_id = self.kwargs.get('family_id')
+            return self.request.user.families.filter(id=family_id).exists()
+        
+        # For views with object that has family attribute
+        if hasattr(self, 'get_object'):
+            obj = self.get_object()
+            if hasattr(obj, 'family'):
+                return self.request.user.families.filter(id=obj.family.id).exists()
+        
+        return False
+
+
+# Family Views
+class FamilyListView(LoginRequiredMixin, ListView):
+    model = Family
+    context_object_name = 'families'
+    template_name = 'tracker/family_list.html'
     
-    if request.method == 'POST':
-        event.delete()
+    def get_queryset(self):
+        return self.request.user.families.all()
+
+class FamilyDetailView(LoginRequiredMixin, FamilyMemberRequiredMixin, DetailView):
+    model = Family
+    context_object_name = 'family'
+    template_name = 'tracker/family_detail.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        family = self.get_object()
+        context['vehicles'] = family.vehicles.all()
+        context['members'] = family.members.all()
+        return context
+
+
+class FamilyCreateView(LoginRequiredMixin, CreateView):
+    model = Family
+    form_class = FamilyForm
+    template_name = 'tracker/family_form.html'
+    success_url = reverse_lazy('family_list')
+    
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        response = super().form_valid(form)
+        # Add creator as a member
+        self.object.members.add(self.request.user)
+        messages.success(self.request, f"Family '{self.object.name}' created successfully.")
+        return response
+
+
+class FamilyUpdateView(LoginRequiredMixin, FamilyMemberRequiredMixin, UpdateView):
+    model = Family
+    form_class = FamilyForm
+    template_name = 'tracker/family_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('family_detail', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Family '{self.object.name}' updated successfully.")
+        return response
+
+
+class FamilyDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Family
+    template_name = 'tracker/family_confirm_delete.html'
+    success_url = reverse_lazy('family_list')
+    
+    def test_func(self):
+        family = self.get_object()
+        return self.request.user == family.created_by
+    
+    def delete(self, request, *args, **kwargs):
+        family = self.get_object()
+        messages.success(request, f"Family '{family.name}' deleted successfully.")
+        return super().delete(request, *args, **kwargs)
+
+
+class FamilyMemberAddView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    form_class = FamilyMemberForm
+    template_name = 'tracker/family_member_form.html'
+    
+    def test_func(self):
+        family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
+        return self.request.user == family.created_by
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
+        kwargs['family'] = family
+        return kwargs
+    
+    def form_valid(self, form):
+        family = get_object_or_404(Family, pk=self.kwargs.get('pk'))
+        email = form.cleaned_data['email']
+        
+        try:
+            user = User.objects.get(email=email)
+            if user in family.members.all():
+                messages.warning(self.request, f"{user.username} is already a member of this family.")
+            else:
+                family.members.add(user)
+                messages.success(self.request, f"{user.username} added to the family.")
+        except User.DoesNotExist:
+            messages.error(self.request, f"No user found with email {email}.")
+        
+        return redirect('family_detail', pk=family.pk)
+
+
+class FamilyMemberRemoveView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    template_name = 'tracker/family_member_confirm_remove.html'
+    
+    def test_func(self):
+        family = get_object_or_404(Family, pk=self.kwargs.get('family_pk'))
+        return self.request.user == family.created_by
+    
+    def get_object(self):
+        family = get_object_or_404(Family, pk=self.kwargs.get('family_pk'))
+        user = get_object_or_404(User, pk=self.kwargs.get('user_pk'))
+        
+        # Check if user is family creator - can't remove creator
+        if user == family.created_by:
+            messages.error(self.request, "Cannot remove the family creator.")
+            return None
+            
+        return {'family': family, 'user': user}
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.object:
+            context['family'] = self.object['family']
+            context['member'] = self.object['user']
+        return context
+    
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if not self.object:
+            return redirect('family_detail', pk=self.kwargs.get('family_pk'))
+            
+        family = self.object['family']
+        user = self.object['user']
+        
+        family.members.remove(user)
+        messages.success(request, f"{user.username} has been removed from the family.")
+        
+        return redirect('family_detail', pk=family.pk)
+    
+    def get_success_url(self):
+        return reverse_lazy('family_detail', kwargs={'pk': self.kwargs.get('family_pk')})
+
+class VehicleListView(LoginRequiredMixin, ListView):
+    model = Vehicle
+    context_object_name = 'vehicles'
+    template_name = 'tracker/vehicle_list.html'
+    
+    def get_queryset(self):
+        # Get vehicles from all families the user belongs to
+        user_families = self.request.user.families.all()
+        return Vehicle.objects.filter(family__in=user_families)
+
+
+class VehicleDetailView(LoginRequiredMixin, FamilyMemberRequiredMixin, DetailView):
+    model = Vehicle
+    context_object_name = 'vehicle'
+    template_name = 'tracker/vehicle_detail.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        vehicle = self.get_object()
+        context['events'] = vehicle.events.order_by('-date')[:5]
+        context['todo_items'] = vehicle.todo_items.filter(completed=False)
+        return context
+
+
+class VehicleCreateView(LoginRequiredMixin, CreateView):
+    model = Vehicle
+    fields = ['name', 'make', 'model', 'year', 'type', 'image', 'family']
+    template_name = 'tracker/vehicle_form.html'
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Limit family choices to only families the user belongs to
+        form.fields['family'].queryset = self.request.user.families.all()
+        return form
+    
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Vehicle '{self.object.name}' created successfully.")
+        return response
+    
+    def get_success_url(self):
+        return reverse_lazy('vehicle_detail', kwargs={'pk': self.object.pk})
+
+
+class VehicleUpdateView(LoginRequiredMixin, FamilyMemberRequiredMixin, UpdateView):
+    model = Vehicle
+    fields = ['name', 'make', 'model', 'year', 'type', 'image', 'family']
+    template_name = 'tracker/vehicle_form.html'
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Limit family choices to only families the user belongs to
+        form.fields['family'].queryset = self.request.user.families.all()
+        return form
+    
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Vehicle '{self.object.name}' updated successfully.")
+        return response
+    
+    def get_success_url(self):
+        return reverse_lazy('vehicle_detail', kwargs={'pk': self.object.pk})
+
+
+class VehicleDeleteView(LoginRequiredMixin, FamilyMemberRequiredMixin, DeleteView):
+    model = Vehicle
+    template_name = 'tracker/vehicle_confirm_delete.html'
+    success_url = reverse_lazy('vehicle_list')
+    
+    def delete(self, request, *args, **kwargs):
+        vehicle = self.get_object()
+        messages.success(request, f"Vehicle '{vehicle.name}' deleted successfully.")
+        return super().delete(request, *args, **kwargs)
+    
+class EventListView(LoginRequiredMixin, ListView):
+    model = Event
+    context_object_name = 'events'
+    template_name = 'tracker/event_list.html'
+    
+    def get_queryset(self):
+        # Get events from all vehicles in families the user belongs to
+        user_families = self.request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        return Event.objects.filter(vehicle__in=vehicles).order_by('-date')
+
+class EventDetailView(LoginRequiredMixin, DetailView):
+    model = Event
+    context_object_name = 'event'
+    template_name = 'tracker/event_detail.html'
+    
+    def test_func(self):
+        event = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=event.vehicle.family.id).exists()
+
+class EventCreateView(LoginRequiredMixin, TemplateView):
+    template_name = 'tracker/event_type_select.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['vehicle_id'] = self.request.GET.get('vehicle')
+        return context
+
+class MaintenanceCreateView(LoginRequiredMixin, CreateView):
+    model = Event
+    form_class = MaintenanceEventForm
+    template_name = 'tracker/event_form.html'
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        vehicle_id = self.request.GET.get('vehicle')
+        if vehicle_id:
+            initial['vehicle'] = vehicle_id
+        return initial
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['event_type'] = 'maintenance'
+        return context
+    
+    def form_valid(self, form):
+        event = form.save(commit=False)
+        event.user = self.request.user
+        event.event_type = 'maintenance'
+        event.save()
+        messages.success(self.request, 'Maintenance record added successfully!')
+        return redirect('vehicle_detail', pk=event.vehicle.pk)
+
+class GasCreateView(LoginRequiredMixin, CreateView):
+    model = Event
+    form_class = GasEventForm
+    template_name = 'tracker/event_form.html'
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        vehicle_id = self.request.GET.get('vehicle')
+        
+        if not vehicle_id:
+            # Try to find most recently used vehicle
+            try:
+                last_event = Event.objects.filter(
+                    user=self.request.user
+                ).order_by('-date', '-created_at').first()
+                
+                if last_event and last_event.vehicle:
+                    initial['vehicle'] = last_event.vehicle.id
+            except Exception:
+                pass
+        else:
+            initial['vehicle'] = vehicle_id
+            
+        return initial
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['event_type'] = 'gas'
+        return context
+    
+    def form_valid(self, form):
+        event = form.save(commit=False)
+        event.user = self.request.user
+        event.event_type = 'gas'
+        event.save()
+        messages.success(self.request, 'Gas fill-up record added successfully!')
+        return redirect('vehicle_detail', pk=event.vehicle.pk)
+
+class OutingCreateView(LoginRequiredMixin, CreateView):
+    model = Event
+    form_class = OutingEventForm
+    template_name = 'tracker/event_form.html'
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        vehicle_id = self.request.GET.get('vehicle')
+        if vehicle_id:
+            initial['vehicle'] = vehicle_id
+        return initial
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['event_type'] = 'outing'
+        return context
+    
+    def form_valid(self, form):
+        event = form.save(commit=False)
+        event.user = self.request.user
+        event.event_type = 'outing'
+        event.save()
+        messages.success(self.request, 'Outing record added successfully!')
+        return redirect('vehicle_detail', pk=event.vehicle.pk)
+
+class EventUpdateView(LoginRequiredMixin, UpdateView):
+    model = Event
+    template_name = 'tracker/event_form.html'
+    
+    def get_form_class(self):
+        event = self.get_object()
+        if event.event_type == 'maintenance':
+            return MaintenanceEventForm
+        elif event.event_type == 'gas':
+            return GasEventForm
+        else:  # outing
+            return OutingEventForm
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        event = self.get_object()
+        context['event_type'] = event.event_type
+        context['event'] = event
+        return context
+    
+    def form_valid(self, form):
+        event = form.save()
+        messages.success(self.request, f'{event.event_type.title()} record updated successfully!')
+        return redirect('vehicle_detail', pk=event.vehicle.pk)
+    
+    def test_func(self):
+        event = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=event.vehicle.family.id).exists()
+
+class EventDeleteView(LoginRequiredMixin, DeleteView):
+    model = Event
+    template_name = 'tracker/event_confirm_delete.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('vehicle_detail', kwargs={'pk': self.object.vehicle.pk})
+    
+    def delete(self, request, *args, **kwargs):
+        event = self.get_object()
         messages.success(request, f'{event.event_type.title()} record deleted successfully!')
-        return redirect('vehicle_detail', pk=vehicle_pk)
+        return super().delete(request, *args, **kwargs)
     
-    return render(request, 'tracker/event_confirm_delete.html', {'event': event})
+    def test_func(self):
+        event = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=event.vehicle.family.id).exists()
 
-# Location views
-@login_required
-def location_list(request):
-    locations = Location.objects.filter(created_by=request.user)
-    return render(request, 'tracker/location_list.html', {'locations': locations})
-
-@login_required
-def location_create(request):
-    if request.method == 'POST':
-        form = LocationForm(request.POST)
-        if form.is_valid():
-            location = form.save(commit=False)
-            location.created_by = request.user
-            location.save()
-            messages.success(request, 'Location added successfully!')
-            return redirect('location_list')
-    else:
-        form = LocationForm()
+class TodoListView(LoginRequiredMixin, ListView):
+    model = TodoItem
+    context_object_name = 'todos'
+    template_name = 'tracker/todo_list.html'
     
-    return render(request, 'tracker/location_form.html', {'form': form})
+    def get_queryset(self):
+        return TodoItem.objects.filter(
+            Q(user=self.request.user) | Q(shared_with=self.request.user)
+        ).distinct().order_by('completed', '-created_at')
 
-# Todo views
-@login_required
-def todo_list(request):
-    todos = TodoItem.objects.filter(
-        Q(user=request.user) | Q(shared_with=request.user)
-    ).distinct().order_by('completed', '-created_at')
-    return render(request, 'tracker/todo_list.html', {'todos': todos})
-
-@login_required
-def todo_create(request):
-    if request.method == 'POST':
-        form = TodoItemForm(request.POST, user=request.user)
-        if form.is_valid():
-            todo = form.save(commit=False)
-            todo.user = request.user
-            todo.save()
-            
-            # Save the many-to-many relationships
-            form.save_m2m()
-            
-            messages.success(request, 'Todo item added successfully!')
-            return redirect('todo_list')
-    else:
-        form = TodoItemForm(user=request.user)
+class TodoDetailView(LoginRequiredMixin, DetailView):
+    model = TodoItem
+    context_object_name = 'todo'
+    template_name = 'tracker/todo_detail.html'
     
-    return render(request, 'tracker/todo_form.html', {'form': form})
+    def get_queryset(self):
+        return TodoItem.objects.filter(
+            Q(user=self.request.user) | Q(shared_with=self.request.user)
+        ).distinct()
 
-@login_required
-def todo_toggle(request, pk):
-    todo = get_object_or_404(
-        Q(user=request.user) | Q(shared_with=request.user),
-        TodoItem, 
-        pk=pk,
-        
-    )
+class TodoCreateView(LoginRequiredMixin, CreateView):
+    model = TodoItem
+    form_class = TodoItemForm
+    template_name = 'tracker/todo_form.html'
+    success_url = reverse_lazy('todo_list')
     
-    # Only the owner can toggle completion
-    if todo.user == request.user:
-        todo.completed = not todo.completed
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        todo = form.save(commit=False)
+        todo.user = self.request.user
         todo.save()
-    
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'success', 'completed': todo.completed})
-    
-    return redirect('todo_list')
+        form.save_m2m()
+        messages.success(self.request, 'Todo item added successfully!')
+        return super().form_valid(form)
 
-# Reports
-@login_required
-def reports(request):
-    vehicles = Vehicle.objects.filter(owner=request.user)
+class TodoUpdateView(LoginRequiredMixin, UpdateView):
+    model = TodoItem
+    form_class = TodoItemForm
+    template_name = 'tracker/todo_form.html'
+    success_url = reverse_lazy('todo_list')
     
-    context = {
-        'vehicles': vehicles,
-    }
-    return render(request, 'tracker/reports.html', context)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_queryset(self):
+        # Only allow owner to update
+        return TodoItem.objects.filter(user=self.request.user)
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Todo item updated successfully!')
+        return super().form_valid(form)
 
-@login_required
-def vehicle_report(request, pk):
-    vehicle = get_object_or_404(Vehicle, pk=pk, owner=request.user)
+class TodoDeleteView(LoginRequiredMixin, DeleteView):
+    model = TodoItem
+    template_name = 'tracker/todo_confirm_delete.html'
+    success_url = reverse_lazy('todo_list')
     
-    # Date range filtering
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
+    def get_queryset(self):
+        # Only allow owner to delete
+        return TodoItem.objects.filter(user=self.request.user)
     
-    events = Event.objects.filter(vehicle=vehicle)
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Todo item deleted successfully!')
+        return super().delete(request, *args, **kwargs)
+
+class TodoToggleView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        todo = get_object_or_404(
+            Q(user=request.user) | Q(shared_with=request.user),
+            TodoItem, 
+            pk=pk
+        )
+        
+        # Only the owner can toggle completion
+        if todo.user == request.user:
+            todo.completed = not todo.completed
+            todo.save()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'completed': todo.completed})
+        
+        return redirect('todo_list')
+
+class LocationListView(LoginRequiredMixin, ListView):
+    model = Location
+    context_object_name = 'locations'
+    template_name = 'tracker/location_list.html'
     
-    if start_date:
-        events = events.filter(date__gte=start_date)
+    def get_queryset(self):
+        return Location.objects.filter(created_by=self.request.user)
+
+class LocationDetailView(LoginRequiredMixin, DetailView):
+    model = Location
+    context_object_name = 'location'
+    template_name = 'tracker/location_detail.html'
     
-    if end_date:
-        events = events.filter(date__lte=end_date)
+    def get_queryset(self):
+        return Location.objects.filter(created_by=self.request.user)
+
+class LocationCreateView(LoginRequiredMixin, CreateView):
+    model = Location
+    form_class = LocationForm
+    template_name = 'tracker/location_form.html'
+    success_url = reverse_lazy('location_list')
     
-    # Group events by type
-    maintenance_events = events.filter(event_type='maintenance')
-    gas_events = events.filter(event_type='gas')
-    outing_events = events.filter(event_type='outing')
+    def form_valid(self, form):
+        location = form.save(commit=False)
+        location.created_by = self.request.user
+        location.save()
+        messages.success(self.request, 'Location added successfully!')
+        return super().form_valid(form)
+
+class LocationUpdateView(LoginRequiredMixin, UpdateView):
+    model = Location
+    form_class = LocationForm
+    template_name = 'tracker/location_form.html'
+    success_url = reverse_lazy('location_list')
     
-    # Calculate statistics
-    total_maintenance_cost = maintenance_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
-    total_gas_cost = gas_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
+    def get_queryset(self):
+        return Location.objects.filter(created_by=self.request.user)
     
-    # Calculate MPG
-    mpg_data = []
-    for event in gas_events.order_by('date'):
-        if event.get_mpg():
-            mpg_data.append({
-                'date': event.date.strftime('%Y-%m-%d'),
-                'mpg': event.get_mpg(),
-            })
+    def form_valid(self, form):
+        messages.success(self.request, 'Location updated successfully!')
+        return super().form_valid(form)
+
+class LocationDeleteView(LoginRequiredMixin, DeleteView):
+    model = Location
+    template_name = 'tracker/location_confirm_delete.html'
+    success_url = reverse_lazy('location_list')
     
-    # Calculate average MPG
-    if mpg_data:
-        avg_mpg = sum(item['mpg'] for item in mpg_data) / len(mpg_data)
+    def get_queryset(self):
+        return Location.objects.filter(created_by=self.request.user)
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Location deleted successfully!')
+        return super().delete(request, *args, **kwargs)
+
+class ReportsView(LoginRequiredMixin, TemplateView):
+    template_name = 'tracker/reports.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get all vehicles in families the user belongs to
+        user_families = self.request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        
+        context['vehicles'] = vehicles
+        return context
+
+class VehicleReportView(LoginRequiredMixin, DetailView):
+    model = Vehicle
+    template_name = 'tracker/vehicle_report.html'
+    context_object_name = 'vehicle'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        vehicle = self.get_object()
+        
+        # Date range filtering
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        
+        events = Event.objects.filter(vehicle=vehicle)
+        
+        if start_date:
+            events = events.filter(date__gte=start_date)
+        
+        if end_date:
+            events = events.filter(date__lte=end_date)
+        
+        # Group events by type
+        maintenance_events = events.filter(event_type='maintenance')
+        gas_events = events.filter(event_type='gas')
+        outing_events = events.filter(event_type='outing')
+        
+        # Calculate statistics
+        total_maintenance_cost = maintenance_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
+        total_gas_cost = gas_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
+        
+        # Calculate MPG
+        mpg_data = []
+        for event in gas_events.order_by('date'):
+            if event.get_mpg():
+                mpg_data.append({
+                    'date': event.date.strftime('%Y-%m-%d'),
+                    'mpg': event.get_mpg(),
+                })
+        
+        # Calculate average MPG
+        if mpg_data:
+            avg_mpg = sum(item['mpg'] for item in mpg_data) / len(mpg_data)
+        else:
+            avg_mpg = 0
+        
+        context.update({
+            'maintenance_events': maintenance_events,
+            'gas_events': gas_events,
+            'outing_events': outing_events,
+            'total_maintenance_cost': total_maintenance_cost,
+            'total_gas_cost': total_gas_cost,
+            'avg_mpg': avg_mpg,
+            'mpg_data': mpg_data,
+            'start_date': start_date,
+            'end_date': end_date,
+        })
+        return context
+    
+    def test_func(self):
+        vehicle = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=vehicle.family.id).exists()
+
+class MaintenanceScheduleListView(LoginRequiredMixin, ListView):
+    model = MaintenanceSchedule
+    template_name = 'tracker/maintenance_schedule_list.html'
+    context_object_name = 'schedules'
+    
+    def get_queryset(self):
+        # Get all vehicles in families the user belongs to
+        user_families = self.request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        
+        return MaintenanceSchedule.objects.filter(
+            vehicle__in=vehicles,
+            is_active=True
+        ).order_by('vehicle', 'name')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        schedules = self.get_queryset()
+        
+        # Find due schedules
+        due_schedules = [schedule for schedule in schedules if schedule.is_due()]
+        
+        # Group by vehicle
+        user_families = self.request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        vehicle_schedules = {}
+        
+        for vehicle in vehicles:
+            vehicle_schedules[vehicle] = schedules.filter(vehicle=vehicle)
+        
+        context.update({
+            'due_schedules': due_schedules,
+            'vehicle_schedules': vehicle_schedules,
+        })
+        
+        return context
+
+class MaintenanceScheduleCreateView(LoginRequiredMixin, CreateView):
+    model = MaintenanceSchedule
+    form_class = MaintenanceScheduleForm
+    template_name = 'tracker/maintenance_schedule_form.html'
+    success_url = reverse_lazy('maintenance_schedule_list')
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        vehicle_id = self.request.GET.get('vehicle')
+        if vehicle_id:
+            initial['vehicle'] = vehicle_id
+        return initial
+    
+    def form_valid(self, form):
+        schedule = form.save(commit=False)
+        schedule.created_by = self.request.user
+        schedule.save()
+        messages.success(self.request, 'Maintenance schedule created successfully!')
+        return super().form_valid(form)
+
+class MaintenanceScheduleUpdateView(LoginRequiredMixin, UpdateView):
+    model = MaintenanceSchedule
+    form_class = MaintenanceScheduleForm
+    template_name = 'tracker/maintenance_schedule_form.html'
+    success_url = reverse_lazy('maintenance_schedule_list')
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Maintenance schedule updated successfully!')
+        return super().form_valid(form)
+    
+    def test_func(self):
+        schedule = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=schedule.vehicle.family.id).exists()
+
+class MaintenanceScheduleDeleteView(LoginRequiredMixin, DeleteView):
+    model = MaintenanceSchedule
+    template_name = 'tracker/maintenance_schedule_confirm_delete.html'
+    success_url = reverse_lazy('maintenance_schedule_list')
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, 'Maintenance schedule deleted successfully!')
+        return super().delete(request, *args, **kwargs)
+    
+    def test_func(self):
+        schedule = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=schedule.vehicle.family.id).exists()
+
+
+class ExportDataView(LoginRequiredMixin, View):
+    def get(self, request, type, pk=None):
+        """Export data to CSV format"""
+        import csv
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{type}_export.csv"'
+        
+        writer = csv.writer(response)
+        
+        # Get all vehicles in families the user belongs to
+        user_families = self.request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+        
+        if type == 'vehicle' and pk:
+            # Export single vehicle data
+            vehicle = get_object_or_404(Vehicle, pk=pk)
+            
+            # Ensure user has access to this vehicle
+            if vehicle.family not in user_families:
+                return redirect('reports')
+            
+            # Header row
+            writer.writerow(['Event Type', 'Date', 'Miles/Hours', 'Category', 'Location', 'Cost', 'Notes'])
+            
+            # Data rows
+            events = Event.objects.filter(vehicle=vehicle).order_by('date')
+            for event in events:
+                distance = event.miles if vehicle.type == 'car' else event.hours
+                category = event.maintenance_category.name if event.maintenance_category else ''
+                location = event.location.name if event.location else ''
+                cost = event.total_cost if event.total_cost else ''
+                
+                writer.writerow([
+                    event.get_event_type_display(),
+                    event.date.strftime('%Y-%m-%d'),
+                    distance,
+                    category,
+                    location,
+                    cost,
+                    event.notes
+                ])
+        
+        elif type == 'vehicles':
+            # Export all vehicle summary
+            writer.writerow(['Name', 'Make', 'Model', 'Year', 'Type', 'Total Events'])
+            
+            for vehicle in vehicles:
+                event_count = Event.objects.filter(vehicle=vehicle).count()
+                
+                writer.writerow([
+                    vehicle.name,
+                    vehicle.make,
+                    vehicle.model,
+                    vehicle.year,
+                    vehicle.get_type_display(),
+                    event_count
+                ])
+        
+        elif type == 'maintenance':
+            # Export maintenance records
+            writer.writerow(['Vehicle', 'Date', 'Category', 'Miles/Hours', 'Cost', 'Notes'])
+            
+            events = Event.objects.filter(
+                vehicle__in=vehicles,
+                event_type='maintenance'
+            ).select_related('vehicle', 'maintenance_category').order_by('date')
+            
+            for event in events:
+                distance = event.miles if event.vehicle.type == 'car' else event.hours
+                category = event.maintenance_category.name if event.maintenance_category else ''
+                
+                writer.writerow([
+                    str(event.vehicle),
+                    event.date.strftime('%Y-%m-%d'),
+                    category,
+                    distance,
+                    event.total_cost if event.total_cost else '',
+                    event.notes
+                ])
+        
+        return response
+
+
+# API Views for charts and data
+class VehicleEventsApiView(LoginRequiredMixin, View):
+    def get(self, request, vehicle_id):
+        # Get vehicle and check access
+        user_families = request.user.families.all()
+        vehicle = get_object_or_404(Vehicle, pk=vehicle_id)
+        
+        if vehicle.family not in user_families:
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Get events and format for chart
+        events = Event.objects.filter(vehicle=vehicle).values('event_type').annotate(count=Count('id'))
+        
+        # Format data for charts
+        data = {
+            'labels': [event['event_type'] for event in events],
+            'data': [event['count'] for event in events],
+        }
+        
+        return JsonResponse(data)
+
+
+class VehicleMileageApiView(LoginRequiredMixin, View):
+    def get(self, request, vehicle_id):
+        # Get vehicle and check access
+        user_families = request.user.families.all()
+        vehicle = get_object_or_404(Vehicle, pk=vehicle_id)
+        
+        if vehicle.family not in user_families:
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Get events with mileage/hours data
+        if vehicle.type == 'car':
+            events = Event.objects.filter(
+                vehicle=vehicle, 
+                miles__isnull=False
+            ).order_by('date').values('date', 'miles')
+            
+            # Format data for charts
+            data = {
+                'labels': [event['date'].strftime('%Y-%m-%d') for event in events],
+                'data': [float(event['miles']) for event in events],
+                'unit': 'miles',
+            }
+        else:
+            events = Event.objects.filter(
+                vehicle=vehicle, 
+                hours__isnull=False
+            ).order_by('date').values('date', 'hours')
+            
+            # Format data for charts
+            data = {
+                'labels': [event['date'].strftime('%Y-%m-%d') for event in events],
+                'data': [float(event['hours']) for event in events],
+                'unit': 'hours',
+            }
+        
+        return JsonResponse(data)
+
+
+class VehicleFuelEfficiencyApiView(LoginRequiredMixin, View):
+    def get(self, request, vehicle_id):
+        # Get vehicle and check access
+        user_families = request.user.families.all()
+        vehicle = get_object_or_404(Vehicle, pk=vehicle_id)
+        
+        if vehicle.family not in user_families:
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Only for cars
+        if vehicle.type != 'car':
+            return JsonResponse({'error': 'Not applicable for this vehicle type'}, status=400)
+        
+        # Get gas events
+        gas_events = Event.objects.filter(
+            vehicle=vehicle,
+            event_type='gas',
+            miles__isnull=False,
+            gallons__isnull=False
+        ).order_by('date')
+        
+        # Calculate MPG for each event
+        mpg_data = []
+        for event in gas_events:
+            mpg = event.get_mpg()
+            if mpg:
+                mpg_data.append({
+                    'date': event.date.strftime('%Y-%m-%d'),
+                    'mpg': mpg,
+                })
+        
+        # Format data for charts
+        data = {
+            'labels': [item['date'] for item in mpg_data],
+            'data': [item['mpg'] for item in mpg_data],
+        }
+        
+        return JsonResponse(data)
+
+
+def vehicle_events_api(request, vehicle_id):
+    """Function-based view for backward compatibility"""
+    view = VehicleEventsApiView.as_view()
+    return view(request, vehicle_id=vehicle_id)
+
+
+def vehicle_mileage_api(request, vehicle_id):
+    """Function-based view for backward compatibility"""
+    view = VehicleMileageApiView.as_view()
+    return view(request, vehicle_id=vehicle_id)
+
+
+def vehicle_fuel_efficiency_api(request, vehicle_id):
+    """Function-based view for backward compatibility"""
+    view = VehicleFuelEfficiencyApiView.as_view()
+    return view(request, vehicle_id=vehicle_id)
+
+
+def register(request):
+    """View for user registration"""
+    if request.method == 'POST':
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            username = form.cleaned_data.get('username')
+            messages.success(request, f'Account created for {username}! You can now log in.')
+            return redirect('login')
     else:
-        avg_mpg = 0
-    
-    context = {
-        'vehicle': vehicle,
-        'maintenance_events': maintenance_events,
-        'gas_events': gas_events,
-        'outing_events': outing_events,
-        'total_maintenance_cost': total_maintenance_cost,
-        'total_gas_cost': total_gas_cost,
-        'avg_mpg': avg_mpg,
-        'mpg_data': mpg_data,
-        'start_date': start_date,
-        'end_date': end_date,
-    }
-    return render(request, 'tracker/vehicle_report.html', context)
+        form = UserRegisterForm()
+    return render(request, 'registration/register.html', {'form': form})
 
-# Add these to the existing views.py file
 
-@login_required
+def service_worker(request):
+    """View for service worker script"""
+    return render(request, 'sw.js', content_type='application/javascript')
+
+
 def health_check(request):
     """Health check endpoint for monitoring"""
     from django.db import connection
-    from django.http import JsonResponse
+    from django.conf import settings
     from redis import Redis
     import socket
     
@@ -409,255 +1081,23 @@ def health_check(request):
     
     return JsonResponse(data, status=200 if status else 500)
 
-@login_required
-def maintenance_schedule_list(request):
-    """View all maintenance schedules"""
-    schedules = MaintenanceSchedule.objects.filter(
-        vehicle__owner=request.user,
-        is_active=True
-    ).order_by('vehicle', 'name')
+class LandingPageView(TemplateView):
+    """
+    Landing page view that shows when users are not logged in.
+    This page has no navbar and includes direct links to login and register.
+    """
+    template_name = 'tracker/landing_page.html'
     
-    # Find due schedules
-    due_schedules = [schedule for schedule in schedules if schedule.is_due()]
-    
-    # Group by vehicle
-    vehicles = Vehicle.objects.filter(owner=request.user)
-    vehicle_schedules = {}
-    
-    for vehicle in vehicles:
-        vehicle_schedules[vehicle] = schedules.filter(vehicle=vehicle)
-    
-    context = {
-        'schedules': schedules,
-        'due_schedules': due_schedules,
-        'vehicle_schedules': vehicle_schedules,
-    }
-    
-    return render(request, 'tracker/maintenance_schedule_list.html', context)
-
-@login_required
-def maintenance_schedule_create(request):
-    """Create a new maintenance schedule"""
-    if request.method == 'POST':
-        form = MaintenanceScheduleForm(request.POST, user=request.user)
-        if form.is_valid():
-            schedule = form.save(commit=False)
-            schedule.created_by = request.user
-            schedule.save()
-            messages.success(request, 'Maintenance schedule created successfully!')
-            return redirect('maintenance_schedule_list')
-    else:
-        vehicle_id = request.GET.get('vehicle')
-        initial = {}
-        if vehicle_id:
-            initial['vehicle'] = vehicle_id
-        form = MaintenanceScheduleForm(user=request.user, initial=initial)
-    
-    context = {
-        'form': form,
-    }
-    return render(request, 'tracker/maintenance_schedule_form.html', context)
-
-@login_required
-def export_data(request, type, pk=None):
-    """Export data to CSV format"""
-    import csv
-    from django.http import HttpResponse
-    
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{type}_export.csv"'
-    
-    writer = csv.writer(response)
-    
-    if type == 'vehicle' and pk:
-        # Export single vehicle data
-        vehicle = get_object_or_404(Vehicle, pk=pk, owner=request.user)
-        
-        # Header row
-        writer.writerow(['Event Type', 'Date', 'Miles/Hours', 'Category', 'Location', 'Cost', 'Notes'])
-        
-        # Data rows
-        events = Event.objects.filter(vehicle=vehicle).order_by('date')
-        for event in events:
-            distance = event.miles if vehicle.type == 'car' else event.hours
-            category = event.maintenance_category.name if event.maintenance_category else ''
-            location = event.location.name if event.location else ''
-            cost = event.total_cost if event.total_cost else ''
-            
-            writer.writerow([
-                event.get_event_type_display(),
-                event.date.strftime('%Y-%m-%d'),
-                distance,
-                category,
-                location,
-                cost,
-                event.notes
-            ])
-    
-    elif type == 'vehicles':
-        # Export all vehicle summary
-        writer.writerow(['Name', 'Make', 'Model', 'Year', 'Type', 'Total Events'])
-        
-        vehicles = Vehicle.objects.filter(owner=request.user)
-        for vehicle in vehicles:
-            event_count = Event.objects.filter(vehicle=vehicle).count()
-            
-            writer.writerow([
-                vehicle.name,
-                vehicle.make,
-                vehicle.model,
-                vehicle.year,
-                vehicle.get_type_display(),
-                event_count
-            ])
-    
-    elif type == 'maintenance':
-        # Export maintenance records
-        writer.writerow(['Vehicle', 'Date', 'Category', 'Miles/Hours', 'Cost', 'Notes'])
-        
-        events = Event.objects.filter(
-            user=request.user,
-            event_type='maintenance'
-        ).select_related('vehicle', 'maintenance_category').order_by('date')
-        
-        for event in events:
-            distance = event.miles if event.vehicle.type == 'car' else event.hours
-            category = event.maintenance_category.name if event.maintenance_category else ''
-            
-            writer.writerow([
-                str(event.vehicle),
-                event.date.strftime('%Y-%m-%d'),
-                category,
-                distance,
-                event.total_cost if event.total_cost else '',
-                event.notes
-            ])
-    
-    return response
+    def dispatch(self, request, *args, **kwargs):
+        # Redirect to dashboard if user is already logged in
+        if request.user.is_authenticated:
+            return redirect('dashboard')
+        return super().dispatch(request, *args, **kwargs)
 
 
 
-class VehicleViewSet(viewsets.ModelViewSet):
-    serializer_class = VehicleSerializer
-    
-    def get_queryset(self):
-        return Vehicle.objects.filter(owner=self.request.user)
-    
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-    
-    @action(detail=True)
-    def stats(self, request, pk=None):
-        vehicle = self.get_object()
-        
-        # Calculate statistics
-        event_count = Event.objects.filter(vehicle=vehicle).count()
-        maintenance_count = Event.objects.filter(vehicle=vehicle, event_type='maintenance').count()
-        gas_count = Event.objects.filter(vehicle=vehicle, event_type='gas').count()
-        
-        # Calculate costs
-        from django.db.models import Sum
-        total_maintenance_cost = Event.objects.filter(
-            vehicle=vehicle, event_type='maintenance'
-        ).aggregate(Sum('total_cost'))['total_cost__sum'] or 0
-        
-        total_gas_cost = Event.objects.filter(
-            vehicle=vehicle, event_type='gas'
-        ).aggregate(Sum('total_cost'))['total_cost__sum'] or 0
-        
-        # Get active maintenance schedules
-        schedules = MaintenanceSchedule.objects.filter(
-            vehicle=vehicle, is_active=True
-        )
-        
-        due_schedules = [
-            MaintenanceScheduleSerializer(s).data 
-            for s in schedules if s.is_due()
-        ]
-        
-        return Response({
-            'event_count': event_count,
-            'maintenance_count': maintenance_count,
-            'gas_count': gas_count,
-            'total_maintenance_cost': total_maintenance_cost,
-            'total_gas_cost': total_gas_cost,
-            'due_maintenance': due_schedules,
-        })
-
-class EventViewSet(viewsets.ModelViewSet):
-    """API endpoint for events"""
-    serializer_class = EventSerializer
-    
-    def get_queryset(self):
-        """Return events filtered by the current user"""
-        return Event.objects.filter(user=self.request.user)
-    
-    def perform_create(self, serializer):
-        """Save the event with the current user"""
-        serializer.save(user=self.request.user)
-    
-    @action(detail=False, methods=['get'])
-    def recent(self, request):
-        """Get recent events"""
-        recent_events = self.get_queryset().order_by('-date')[:5]
-        serializer = self.get_serializer(recent_events, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def by_type(self, request):
-        """Get events filtered by type"""
-        event_type = request.query_params.get('type')
-        if event_type:
-            events = self.get_queryset().filter(event_type=event_type)
-            serializer = self.get_serializer(events, many=True)
-            return Response(serializer.data)
-        return Response({'error': 'Type parameter is required'}, status=400)
-    
-class TodoItemViewSet(viewsets.ModelViewSet):
-    serializer_class = TodoItemSerializer
-    
-    def get_queryset(self):
-        from django.db.models import Q
-        return TodoItem.objects.filter(
-            Q(user=self.request.user) | Q(shared_with=self.request.user)
-        ).distinct()
-    
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-    
-    @action(detail=True, methods=['post'])
-    def toggle(self, request, pk=None):
-        todo = self.get_object()
-        
-        # Only the owner can toggle completion
-        if todo.user == request.user:
-            todo.completed = not todo.completed
-            todo.save()
-        
-        serializer = self.get_serializer(todo)
-        return Response(serializer.data)
-    
-
-def register(request):
-    """View for user registration"""
-    if request.method == 'POST':
-        form = UserRegisterForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            username = form.cleaned_data.get('username')
-            messages.success(request, f'Account created for {username}! You can now log in.')
-            return redirect('login')
-    else:
-        form = UserRegisterForm()
-    return render(request, 'registration/register.html', {'form': form})
-
-
-from django.template.loader import get_template
-from django.http import HttpResponse
-def debug_templates(request):
-    """Debug view to check template loading"""
-    try:
-        template = get_template('registration/login.html')
-        return HttpResponse(f"Template found at: {template.origin.name}")
-    except Exception as e:
-        return HttpResponse(f"Error: {str(e)}")
+class CustomLogoutView(LogoutView):
+    """
+    Custom logout view that redirects to the landing page
+    """
+    next_page = reverse_lazy('landing_page')

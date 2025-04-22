@@ -1,111 +1,236 @@
-<!-- tracker/templates/tracker/dashboard.html -->
 {% extends 'tracker/base.html' %}
+{% load static %}
 
-{% block title %}TripTracker - Dashboard{% endblock %}
+{% block title %}Dashboard - TripTracker{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js -->
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="card-title">Welcome to TripTracker</h2>
-                <p class="card-text">Your complete solution for tracking vehicle maintenance, trips, and expenses.</p>
+    <div class="col-md-12">
+        <h1>Dashboard</h1>
+    </div>
+</div>
+
+<!-- Quick Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-people-fill dashboard-icon"></i>
+                <h3 class="card-title">{{ family_count }}</h3>
+                <p class="card-text">Families</p>
+                <a href="{% url 'family_list' %}" class="btn btn-outline-light btn-sm">View All</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-car-front-fill dashboard-icon"></i>
+                <h3 class="card-title">{{ vehicle_count }}</h3>
+                <p class="card-text">Vehicles</p>
+                <a href="{% url 'vehicle_list' %}" class="btn btn-outline-light btn-sm">View All</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-fuel-pump-fill dashboard-icon"></i>
+                <h3 class="card-title">${{ gas_cost|floatformat:2 }}</h3>
+                <p class="card-text">Fuel (30 days)</p>
+                <a href="{% url 'event_list' %}?type=gas" class="btn btn-outline-light btn-sm">Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card bg-danger text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-tools dashboard-icon"></i>
+                <h3 class="card-title">${{ maintenance_cost|floatformat:2 }}</h3>
+                <p class="card-text">Maintenance (30 days)</p>
+                <a href="{% url 'event_list' %}?type=maintenance" class="btn btn-outline-light btn-sm">Details</a>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row dashboard-row">
-    <div class="col-md-8">
-        <div class="card mb-4">
+<div class="row">
+    <!-- Family Overview -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Your Vehicles</h5>
-                <a href="{% url 'vehicle_create' %}" class="btn btn-sm btn-primary">Add Vehicle</a>
+                <h5 class="mb-0">My Families</h5>
+                <a href="{% url 'family_create' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Create
+                </a>
             </div>
             <div class="card-body">
-                {% if vehicles %}
-                    <div class="row">
-                        {% for vehicle in vehicles %}
-                            <div class="col-md-6 mb-3">
-                                <div class="card vehicle-card h-100">
-                                    {% if vehicle.image %}
-                                        <img src="{{ vehicle.image.url }}" class="card-img-top" alt="{{ vehicle }}">
-                                    {% else %}
-                                        <div class="bg-light text-center py-4">
-                                            <i class="dashboard-icon bi bi-car-front"></i>
-                                        </div>
-                                    {% endif %}
-                                    <div class="card-body">
-                                        <h5 class="card-title">{{ vehicle.name }}</h5>
-                                        <p class="card-text">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
-                                        <a href="{% url 'vehicle_detail' vehicle.pk %}" class="btn btn-primary">View Details</a>
-                                    </div>
+                {% if families %}
+                    <div class="list-group">
+                        {% for family_data in families %}
+                            <a href="{% url 'family_detail' family_data.family.id %}" 
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">{{ family_data.family.name }}</h6>
+                                    <small class="text-muted">
+                                        {{ family_data.member_count }} member{{family_data.member_count|pluralize}}
+                                    </small>
                                 </div>
-                            </div>
+                                <span class="badge bg-primary rounded-pill">
+                                    {{ family_data.vehicle_count }} vehicle{{family_data.vehicle_count|pluralize}}
+                                </span>
+                            </a>
                         {% endfor %}
                     </div>
                 {% else %}
-                    <p class="text-center py-3">You haven't added any vehicles yet. <a href="{% url 'vehicle_create' %}">Add your first vehicle</a>.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> You don't have any families yet.
+                        <a href="{% url 'family_create' %}" class="alert-link">Create one</a> to get started.
+                    </div>
                 {% endif %}
             </div>
         </div>
     </div>
     
-    <div class="col-md-4">
-        <div class="card mb-4">
+    <!-- Recent Events -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Recent Activity</h5>
-                <a href="{% url 'event_list' %}" class="btn btn-sm btn-primary">View All</a>
+                <a href="{% url 'event_create' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Add Event
+                </a>
             </div>
             <div class="card-body">
                 {% if recent_events %}
                     <ul class="list-group list-group-flush">
                         {% for event in recent_events %}
-                            <li class="list-group-item">
-                                <strong>{{ event.date|date:"M d, Y" }}</strong> - 
-                                {{ event.get_event_type_display }} for {{ event.vehicle.name }}
-                                <small class="d-block text-muted">{{ event.notes|truncatechars:50 }}</small>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-center py-3">No recent activity.</p>
-                {% endif %}
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">To-Do List</h5>
-                <a href="{% url 'todo_list' %}" class="btn btn-sm btn-primary">View All</a>
-            </div>
-            <div class="card-body">
-                {% if todos %}
-                    <ul class="list-group list-group-flush">
-                        {% for todo in todos %}
-                            <li class="list-group-item todo-item {% if todo.completed %}completed{% endif %}" id="todo-item-{{ todo.id }}">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input todo-checkbox" 
-                                           id="todo-{{ todo.id }}" data-todo-id="{{ todo.id }}"
-                                           {% if todo.completed %}checked{% endif %}>
-                                    <label class="form-check-label todo-title" for="todo-{{ todo.id }}">
-                                        {{ todo.title }}
-                                    </label>
-                                    {% if todo.vehicle %}
-                                        <small class="todo-vehicle d-block">{{ todo.vehicle.name }}</small>
-                                    {% endif %}
+                            <li class="list-group-item event-item {{ event.event_type }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ event.get_event_type_display }}</strong> - {{ event.vehicle.name }}
+                                        <p class="mb-0 text-muted">{{ event.date|date:"M d, Y" }}</p>
+                                    </div>
+                                    <div>
+                                        {% if event.event_type == 'gas' and event.total_cost %}
+                                            <span class="badge bg-warning text-dark">${{ event.total_cost|floatformat:2 }}</span>
+                                        {% elif event.event_type == 'maintenance' and event.total_cost %}
+                                            <span class="badge bg-danger">${{ event.total_cost|floatformat:2 }}</span>
+                                        {% endif %}
+                                        <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-secondary">
+                                            Details
+                                        </a>
+                                    </div>
                                 </div>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-center py-3">No tasks on your to-do list.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No recent activity.
+                        <a href="{% url 'event_create' %}" class="alert-link">Add an event</a> to get started.
+                    </div>
                 {% endif %}
-                <div class="mt-3 text-center">
-                    <a href="{% url 'todo_create' %}" class="btn btn-sm btn-success">Add New Task</a>
-                </div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="row">
+    <!-- To-Do List -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">To-Do Items</h5>
+                <a href="{% url 'todo_create' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Add Task
+                </a>
+            </div>
+            <div class="card-body">
+                {% if todo_items %}
+                    <ul class="list-group list-group-flush">
+                        {% for todo in todo_items %}
+                            <li class="list-group-item todo-item {% if todo.completed %}completed{% endif %}">
+                                <div class="d-flex align-items-center">
+                                    <form method="post" action="{% url 'todo_toggle' todo.id %}" class="me-2">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-check-todo" aria-label="Toggle completion">
+                                            <i class="bi {% if todo.completed %}bi-check-square{% else %}bi-square{% endif %}"></i>
+                                        </button>
+                                    </form>
+                                    <div class="todo-content">
+                                        <h6 class="todo-title mb-0">{{ todo.title }}</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <small class="todo-vehicle">
+                                                {% if todo.vehicle %}{{ todo.vehicle.name }}{% else %}General{% endif %}
+                                                {% if todo.due_date %} • Due: {{ todo.due_date|date:"M d, Y" }}{% endif %}
+                                            </small>
+                                            <span class="badge {% if todo.priority == 2 %}bg-danger{% elif todo.priority == 1 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                                {% if todo.priority == 2 %}High{% elif todo.priority == 1 %}Medium{% else %}Normal{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="text-end mt-2">
+                        <a href="{% url 'todo_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No to-do items found.
+                        <a href="{% url 'todo_create' %}" class="alert-link">Create a task</a> to get started.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance Due -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Maintenance Due</h5>
+            </div>
+            <div class="card-body">
+                {% if maintenance_due %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in maintenance_due %}
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0">{{ item.schedule.name }}</h6>
+                                        <small class="text-muted">{{ item.vehicle.name }}</small>
+                                    </div>
+                                    <a href="{% url 'event_create' %}?vehicle={{ item.vehicle.id }}&type=maintenance&category={{ item.schedule.maintenance_type.id }}" 
+                                       class="btn btn-sm btn-outline-success">
+                                        Mark Complete
+                                    </a>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> No maintenance is currently due.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="{% static 'js/chart.min.js' %}"></script>
+<script>
+    // Add charts initialization if needed
+</script>
 {% endblock %}

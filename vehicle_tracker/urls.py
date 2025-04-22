@@ -5,7 +5,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
-from tracker import views  # Import your views
+from tracker import views  
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -13,7 +13,8 @@ urlpatterns = [
     
     # Add these if you want to use Django's built-in auth views with your custom templates
     path('accounts/', include('django.contrib.auth.urls')),
-    path('debug-templates/', views.debug_templates, name='debug_templates'),
+    
+    path('sw.js', views.service_worker, name='service_worker'),
 ]
 
 # Serve media files in development
