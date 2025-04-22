@@ -1,0 +1,35 @@
+<!-- tracker/templates/tracker/vehicle_confirm_delete.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Delete {{ vehicle.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h2 class="card-title">Delete Vehicle</h2>
+            </div>
+            <div class="card-body">
+                <p class="lead">Are you sure you want to delete <strong>{{ vehicle.name }}</strong>?</p>
+                <p>This will permanently delete the vehicle and all associated records:</p>
+                <ul>
+                    <li>All maintenance records</li>
+                    <li>All gas fill-up records</li>
+                    <li>All outing records</li>
+                    <li>Associated to-do items</li>
+                </ul>
+                <p class="text-danger">This action cannot be undone!</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mt-4 d-flex justify-content-between">
+                        <button type="submit" class="btn btn-danger">Yes, Delete Vehicle</button>
+                        <a href="{% url 'vehicle_detail' vehicle.pk %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

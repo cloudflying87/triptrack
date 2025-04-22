@@ -1,0 +1,148 @@
+/* static/css/styles.css */
+
+/* Custom Variables */
+:root {
+    --primary-color: #4285f4;
+    --secondary-color: #34a853;
+    --warning-color: #fbbc05;
+    --danger-color: #ea4335;
+    --light-gray: #f8f9fa;
+    --dark-gray: #343a40;
+    --triptracker-blue: #1a73e8;  /* Custom brand color */
+    --triptracker-teal: #00897b;  /* Accent color */
+}
+
+/* Base Elements */
+body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Dashboard Styles */
+.dashboard-card {
+    margin-bottom: 20px;
+    height: 100%;
+}
+
+.dashboard-icon {
+    font-size: 2.5rem;
+    color: var(--triptracker-blue);
+    margin-bottom: 15px;
+}
+
+/* Vehicle Cards */
+.vehicle-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.vehicle-card img {
+    height: 200px;
+    object-fit: cover;
+}
+
+.vehicle-stats {
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* Event List */
+.event-item {
+    position: relative;
+    padding: 15px;
+    border-left: 4px solid var(--primary-color);
+    margin-bottom: 10px;
+    background-color: white;
+}
+
+.event-item.maintenance {
+    border-left-color: var(--secondary-color);
+}
+
+.event-item.gas {
+    border-left-color: var(--warning-color);
+}
+
+.event-item.outing {
+    border-left-color: var(--primary-color);
+}
+
+/* Todo List */
+.todo-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.todo-item.completed {
+    opacity: 0.6;
+}
+
+.todo-checkbox {
+    margin-right: 10px;
+}
+
+.todo-content {
+    flex-grow: 1;
+}
+
+.todo-title {
+    margin-bottom: 0;
+    text-decoration: none;
+}
+
+.todo-item.completed .todo-title {
+    text-decoration: line-through;
+}
+
+.todo-vehicle {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Forms */
+.form-card {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.help-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dashboard-row {
+        flex-direction: column;
+    }
+    
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+}
+
+/* PWA related */
+@media (display-mode: standalone) {
+    .navbar {
+        padding-top: env(safe-area-inset-top);
+    }
+    
+    body {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}

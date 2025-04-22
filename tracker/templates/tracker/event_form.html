@@ -1,0 +1,41 @@
+<!-- tracker/templates/tracker/event_form.html -->
+{% extends 'tracker/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}TripTracker - {% if event %}Edit {{ event.get_event_type_display }}{% else %}Add {{ event_type|title }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    {% if event %}
+                        Edit {{ event.get_event_type_display }} Record
+                    {% else %}
+                        Add New {{ event_type|title }} Record
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% if event %}{% url 'event_update' event.pk %}{% else %}{% url 'event_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dynamic form fields based on vehicle type would be handled here
+    });
+</script>
+{% endblock %}

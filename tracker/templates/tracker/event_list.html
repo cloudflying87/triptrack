@@ -1,0 +1,158 @@
+<!-- tracker/templates/tracker/event_list.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Events{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Event History</h1>
+    <div class="dropdown">
+        <button class="btn btn-primary dropdown-toggle" type="button" id="addEventDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-plus"></i> Add Event
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="addEventDropdown">
+            <li><a class="dropdown-item" href="{% url 'maintenance_create' %}">Maintenance</a></li>
+            <li><a class="dropdown-item" href="{% url 'gas_create' %}">Gas Fill-up</a></li>
+            <li><a class="dropdown-item" href="{% url 'outing_create' %}">Outing</a></li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="vehicleFilter" class="form-label">Filter by Vehicle</label>
+                <select class="form-select" id="vehicleFilter">
+                    <option value="">All Vehicles</option>
+                    {% for vehicle in vehicles %}
+                        <option value="{{ vehicle.id }}">{{ vehicle.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="eventTypeFilter" class="form-label">Filter by Type</label>
+                <select class="form-select" id="eventTypeFilter">
+                    <option value="">All Types</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="gas">Gas Fill-up</option>
+                    <option value="outing">Outing</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="dateFilter" class="form-label">Filter by Date</label>
+                <select class="form-select" id="dateFilter">
+                    <option value="">All Dates</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="365">Last Year</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if events %}
+    <div class="timeline mt-4">
+        {% for event in events %}
+            <div class="event-item {{ event.event_type }}">
+                <div class="row">
+                    <div class="col-md-3 col-lg-2">
+                        <div class="event-date">
+                            <strong>{{ event.date|date:"M d, Y" }}</strong>
+                        </div>
+                        <div class="event-vehicle">
+                            {{ event.vehicle.name }}
+                        </div>
+                    </div>
+                    <div class="col-md-7 col-lg-8">
+                        <div class="event-title">
+                            <h5>
+                                <span class="badge {% if event.event_type == 'maintenance' %}bg-success{% elif event.event_type == 'gas' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                                    {{ event.get_event_type_display }}
+                                </span>
+                                
+                                {% if event.event_type == 'maintenance' and event.maintenance_category %}
+                                    {{ event.maintenance_category }}
+                                {% elif event.event_type == 'gas' %}
+                                    Gas Fill-up
+                                    {% if event.get_mpg %} - {{ event.get_mpg }} MPG{% endif %}
+                                {% elif event.event_type == 'outing' and event.location %}
+                                    Trip to {{ event.location }}
+                                {% endif %}
+                            </h5>
+                        </div>
+                        <div class="event-details">
+                            {% if event.event_type == 'maintenance' %}
+                                {% if event.total_cost %}
+                                    <div><strong>Cost:</strong> ${{ event.total_cost }}</div>
+                                {% endif %}
+                                {% if event.miles %}
+                                    <div><strong>Miles:</strong> {{ event.miles }}</div>
+                                {% endif %}
+                                {% if event.hours %}
+                                    <div><strong>Hours:</strong> {{ event.hours }}</div>
+                                {% endif %}
+                            {% elif event.event_type == 'gas' %}
+                                {% if event.gallons %}
+                                    <div><strong>Gallons:</strong> {{ event.gallons }}</div>
+                                {% endif %}
+                                {% if event.price_per_gallon %}
+                                    <div><strong>Price:</strong> ${{ event.price_per_gallon }} per gallon</div>
+                                {% endif %}
+                                {% if event.total_cost %}
+                                    <div><strong>Total Cost:</strong> ${{ event.total_cost }}</div>
+                                {% endif %}
+                                {% if event.miles %}
+                                    <div><strong>Miles:</strong> {{ event.miles }}</div>
+                                {% endif %}
+                            {% elif event.event_type == 'outing' %}
+                                {% if event.miles %}
+                                    <div><strong>Miles:</strong> {{ event.miles }}</div>
+                                {% endif %}
+                                {% if event.hours %}
+                                    <div><strong>Hours:</strong> {{ event.hours }}</div>
+                                {% endif %}
+                            {% endif %}
+                            
+                            {% if event.notes %}
+                                <div class="mt-2">
+                                    <strong>Notes:</strong>
+                                    <p>{{ event.notes }}</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-lg-2">
+                        <div class="event-actions">
+                            <a href="{% url 'event_update' event.pk %}" class="btn btn-sm btn-outline-primary mb-2">
+                                <i class="bi bi-pencil"></i> Edit
+                            </a>
+                            <a href="{% url 'event_delete' event.pk %}" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info text-center mt-4">
+        <p class="mb-0">No events recorded yet.</p>
+        <p>
+            <a href="{% url 'maintenance_create' %}" class="btn btn-success mt-3 me-2">Add Maintenance</a>
+            <a href="{% url 'gas_create' %}" class="btn btn-warning mt-3 me-2">Add Gas Fill-up</a>
+            <a href="{% url 'outing_create' %}" class="btn btn-info mt-3">Add Outing</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filter functionality would be implemented here
+    });
+</script>
+{% endblock %}

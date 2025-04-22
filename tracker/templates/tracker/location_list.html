@@ -1,0 +1,41 @@
+<!-- tracker/templates/tracker/location_list.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Locations{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Your Locations</h1>
+    <a href="{% url 'location_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add Location
+    </a>
+</div>
+
+{% if locations %}
+    <div class="row">
+        {% for location in locations %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ location.name }}</h5>
+                        {% if location.address %}
+                            <p class="card-text">{{ location.address }}</p>
+                        {% endif %}
+                        <div class="mt-2">
+                            <a href="#" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="#" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info text-center">
+        <p class="mb-0">You haven't added any locations yet.</p>
+        <p>
+            <a href="{% url 'location_create' %}" class="btn btn-primary mt-3">Add your first location</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+<!-- tracker/templates/tracker/vehicle_form.html -->
+{% extends 'tracker/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}TripTracker - {% if vehicle %}Edit {{ vehicle.name }}{% else %}Add Vehicle{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">{% if vehicle %}Edit {{ vehicle.name }}{% else %}Add New Vehicle{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% if vehicle %}{% url 'vehicle_detail' vehicle.pk %}{% else %}{% url 'vehicle_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

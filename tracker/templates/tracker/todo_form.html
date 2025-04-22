@@ -1,0 +1,40 @@
+<!-- tracker/templates/tracker/todo_form.html -->
+{% extends 'tracker/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}TripTracker - {% if todo %}Edit Task{% else %}Add Task{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">{% if todo %}Edit Task{% else %}Add New Task{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% url 'todo_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('.select2').select2();
+    });
+</script>
+{% endblock %}

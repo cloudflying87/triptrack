@@ -1,0 +1,51 @@
+<!-- tracker/templates/tracker/vehicle_list.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Your Vehicles{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Your Vehicles</h1>
+    <a href="{% url 'vehicle_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add Vehicle
+    </a>
+</div>
+
+{% if vehicles %}
+    <div class="row">
+        {% for vehicle in vehicles %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card vehicle-card h-100">
+                    {% if vehicle.image %}
+                        <img src="{{ vehicle.image.url }}" class="card-img-top" alt="{{ vehicle }}">
+                    {% else %}
+                        <div class="bg-light text-center py-4">
+                            <i class="dashboard-icon bi bi-car-front"></i>
+                        </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ vehicle.name }}</h5>
+                        <p class="card-text">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Type: {{ vehicle.get_type_display }}
+                            </small>
+                        </p>
+                    </div>
+                    <div class="card-footer bg-transparent d-flex justify-content-between">
+                        <a href="{% url 'vehicle_detail' vehicle.pk %}" class="btn btn-sm btn-primary">View Details</a>
+                        <a href="{% url 'vehicle_update' vehicle.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info text-center">
+        <p class="mb-0">You haven't added any vehicles yet.</p>
+        <p>
+            <a href="{% url 'vehicle_create' %}" class="btn btn-primary mt-3">Add your first vehicle</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

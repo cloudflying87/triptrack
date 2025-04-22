@@ -1,0 +1,122 @@
+<!-- tracker/templates/tracker/todo_list.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - To-Do List{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>To-Do List</h1>
+    <a href="{% url 'todo_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add Task
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="vehicleFilter" class="form-label">Filter by Vehicle</label>
+                <select class="form-select" id="vehicleFilter">
+                    <option value="">All Vehicles</option>
+                    {% for vehicle in vehicles %}
+                        <option value="{{ vehicle.id }}">{{ vehicle.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="statusFilter" class="form-label">Filter by Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="priorityFilter" class="form-label">Filter by Priority</label>
+                <select class="form-select" id="priorityFilter">
+                    <option value="">All Priorities</option>
+                    <option value="2">High</option>
+                    <option value="1">Medium</option>
+                    <option value="0">Normal</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if todos %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Active Tasks</h5>
+        </div>
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush" id="todoList">
+                {% for todo in todos %}
+                    <li class="list-group-item todo-item {% if todo.completed %}completed{% endif %}" id="todo-item-{{ todo.id }}">
+                        <div class="row align-items-center">
+                            <div class="col-md-1">
+                                <input type="checkbox" class="form-check-input todo-checkbox" 
+                                       id="todo-{{ todo.id }}" data-todo-id="{{ todo.id }}"
+                                       {% if todo.completed %}checked{% endif %}>
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-check-label todo-title" for="todo-{{ todo.id }}">
+                                    {{ todo.title }}
+                                    {% if todo.priority == 2 %}
+                                        <span class="badge bg-danger">High</span>
+                                    {% elif todo.priority == 1 %}
+                                        <span class="badge bg-warning text-dark">Medium</span>
+                                    {% endif %}
+                                </label>
+                                {% if todo.description %}
+                                    <small class="d-block text-muted">{{ todo.description|truncatechars:100 }}</small>
+                                {% endif %}
+                                {% if todo.due_date %}
+                                    <small class="d-block text-{% if todo.due_date < today %}danger{% else %}info{% endif %}">
+                                        Due: {{ todo.due_date|date:"M d, Y" }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-2">
+                                {% if todo.vehicle %}
+                                    <small class="todo-vehicle d-block">
+                                        <a href="{% url 'vehicle_detail' todo.vehicle.pk %}">{{ todo.vehicle.name }}</a>
+                                    </small>
+                                {% endif %}
+                                {% if todo.shared_with.exists %}
+                                    <small class="d-block text-info">
+                                        Shared with {{ todo.shared_with.count }} user{{ todo.shared_with.count|pluralize }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <a href="#" class="btn btn-sm btn-outline-primary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="#" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-info text-center">
+        <p class="mb-0">Your to-do list is empty.</p>
+        <p>
+            <a href="{% url 'todo_create' %}" class="btn btn-primary mt-3">Add your first task</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filter functionality would be implemented here
+    });
+</script>
+{% endblock %}

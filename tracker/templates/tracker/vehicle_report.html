@@ -1,0 +1,352 @@
+<!-- tracker/templates/tracker/vehicle_report.html -->
+{% extends 'tracker/base.html' %}
+{% load static %}
+
+{% block title %}TripTracker - {{ vehicle.name }} Report{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>{{ vehicle.name }} Report</h1>
+    <a href="{% url 'export_vehicle_data' vehicle.pk %}" class="btn btn-primary">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Export to CSV
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row">
+            <div class="col-md-5">
+                <label for="daterange" class="form-label">Date Range</label>
+                <input type="text" id="daterange" name="daterange" class="form-control" 
+                       value="{% if start_date %}{{ start_date }} - {{ end_date }}{% endif %}" placeholder="Select date range">
+                <input type="hidden" id="start_date" name="start_date" value="{{ start_date }}">
+                <input type="hidden" id="end_date" name="end_date" value="{{ end_date }}">
+            </div>
+            <div class="col-md-4 align-self-end">
+                <button type="submit" class="btn btn-primary">Apply Filter</button>
+                <a href="{% url 'vehicle_report' vehicle.pk %}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Vehicle Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl>
+                            <dt>Make</dt>
+                            <dd>{{ vehicle.make }}</dd>
+                            
+                            <dt>Model</dt>
+                            <dd>{{ vehicle.model }}</dd>
+                            
+                            <dt>Year</dt>
+                            <dd>{{ vehicle.year }}</dd>
+                            
+                            <dt>Type</dt>
+                            <dd>{{ vehicle.get_type_display }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        {% if vehicle.image %}
+                            <img src="{{ vehicle.image.url }}" class="img-fluid rounded" alt="{{ vehicle }}">
+                        {% else %}
+                            <div class="bg-light text-center py-4 rounded">
+                                <i class="dashboard-icon bi bi-car-front"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Cost Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6>Maintenance Cost</h6>
+                            <p class="display-6">${{ total_maintenance_cost|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6>Fuel Cost</h6>
+                            <p class="display-6">${{ total_gas_cost|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h6>Total Cost</h6>
+                        <p class="display-5">${{ total_cost|floatformat:2 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if vehicle.type == 'car' and mpg_data %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Fuel Efficiency (MPG)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="mpgChart" data-mpg-data="{{ mpg_data|safe }}"></canvas>
+                <div class="text-center mt-3">
+                    <p>Average MPG: <strong>{{ avg_mpg|floatformat:1 }}</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Maintenance Records</h5>
+            </div>
+            <div class="card-body">
+                {% if maintenance_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>{{ vehicle.get_unit|title }}</th>
+                                    <th>Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in maintenance_events %}
+                                    <tr>
+                                        <td>{{ event.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            {% if event.maintenance_category %}
+                                                {{ event.maintenance_category }}
+                                            {% else %}
+                                                General Maintenance
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if vehicle.type == 'car' and event.miles %}
+                                                {{ event.miles }}
+                                            {% elif vehicle.type != 'car' and event.hours %}
+                                                {{ event.hours }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if event.total_cost %}
+                                                ${{ event.total_cost }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center">No maintenance records in the selected period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Gas Fill-ups</h5>
+            </div>
+            <div class="card-body">
+                {% if gas_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Gallons</th>
+                                    <th>Cost</th>
+                                    <th>MPG</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in gas_events %}
+                                    <tr>
+                                        <td>{{ event.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            {% if event.gallons %}
+                                                {{ event.gallons }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if event.total_cost %}
+                                                ${{ event.total_cost }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if event.get_mpg %}
+                                                {{ event.get_mpg }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center">No gas fill-up records in the selected period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Outings/Trips</h5>
+            </div>
+            <div class="card-body">
+                {% if outing_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Location</th>
+                                    <th>{{ vehicle.get_unit|title }}</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in outing_events %}
+                                    <tr>
+                                        <td>{{ event.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            {% if event.location %}
+                                                {{ event.location }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if vehicle.type == 'car' and event.miles %}
+                                                {{ event.miles }}
+                                            {% elif vehicle.type != 'car' and event.hours %}
+                                                {{ event.hours }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ event.notes|truncatechars:50|default:"-" }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center">No outing records in the selected period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // MPG Chart
+        const mpgChartCanvas = document.getElementById('mpgChart');
+        if (mpgChartCanvas) {
+            const mpgData = JSON.parse(mpgChartCanvas.dataset.mpgData || '[]');
+            
+            if (mpgData.length > 0) {
+                new Chart(mpgChartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: mpgData.map(item => item.date),
+                        datasets: [{
+                            label: 'MPG',
+                            data: mpgData.map(item => item.mpg),
+                            borderColor: '#4285f4',
+                            tension: 0.1,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // DateRangePicker
+        $('#daterange').daterangepicker({
+            opens: 'left',
+            autoUpdateInput: false,
+            locale: {
+                cancelLabel: 'Clear'
+            }
+        });
+        
+        $('#daterange').on('apply.daterangepicker', function(ev, picker) {
+            $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+            $('#start_date').val(picker.startDate.format('YYYY-MM-DD'));
+            $('#end_date').val(picker.endDate.format('YYYY-MM-DD'));
+        });
+        
+        $('#daterange').on('cancel.daterangepicker', function(ev, picker) {
+            $(this).val('');
+            $('#start_date').val('');
+            $('#end_date').val('');
+        });
+    });
+</script>
+{% endblock %}

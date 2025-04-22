@@ -1,0 +1,111 @@
+<!-- tracker/templates/tracker/reports.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Reports{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Reports</h1>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Vehicle Reports</h5>
+            </div>
+            <div class="card-body">
+                <p>Select a vehicle to view its detailed report:</p>
+                <div class="list-group">
+                    {% for vehicle in vehicles %}
+                        <a href="{% url 'vehicle_report' vehicle.pk %}" class="list-group-item list-group-item-action">
+                            {{ vehicle.name }} ({{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }})
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Fleet Summary</h5>
+            </div>
+            <div class="card-body">
+                <h6>Total Vehicles: {{ vehicles.count }}</h6>
+                <div class="mb-3">
+                    <h6>Vehicles by Type:</h6>
+                    <ul>
+                        {% for type, count in vehicle_types.items %}
+                            <li>{{ type }}: {{ count }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="mb-3">
+                    <h6>Maintenance Summary:</h6>
+                    <p>Total maintenance events: {{ maintenance_count }}</p>
+                    <p>Total maintenance cost: ${{ maintenance_cost|floatformat:2 }}</p>
+                </div>
+                <div>
+                    <h6>Fuel Summary:</h6>
+                    <p>Total gas fill-ups: {{ gas_count }}</p>
+                    <p>Total fuel cost: ${{ gas_cost|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Export Data</h5>
+            </div>
+            <div class="card-body">
+                <p>Export your data to CSV format:</p>
+                <div class="list-group">
+                    <a href="{% url 'export_vehicles_data' %}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export All Vehicles
+                    </a>
+                    <a href="{% url 'export_maintenance_data' %}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export All Maintenance Records
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Gas Fill-up Records
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Maintenance Due</h5>
+            </div>
+            <div class="card-body">
+                {% if due_maintenance %}
+                    <div class="list-group">
+                        {% for maintenance in due_maintenance %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ maintenance.name }}</h6>
+                                    <span class="badge bg-danger">Due</span>
+                                </div>
+                                <p class="mb-0">{{ maintenance.vehicle.name }}</p>
+                                <small class="text-muted">
+                                    {% if maintenance.last_performed %}
+                                        Last performed: {{ maintenance.last_performed|date:"M d, Y" }}
+                                    {% else %}
+                                        Never performed
+                                    {% endif %}
+                                </small>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center">No maintenance due at this time.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

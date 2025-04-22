@@ -1,0 +1,12 @@
+Django==5.2
+gunicorn==21.2.0
+Pillow==11.2.1
+python-dotenv==1.0.0
+whitenoise==6.6.0
+dj-database-url==2.1.0
+django-crispy-forms==2.1
+crispy-bootstrap5==0.7
+psycopg2-binary==2.9.10
+redis==5.0.1
+django-imagekit==5.0.0
+djangorestframework==3.15.0
