@@ -1,0 +1,14 @@
+<!-- templates/500.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Server Error{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <h1 class="display-1">500</h1>
+    <h2>Oops! Engine trouble.</h2>
+    <p class="lead">We're experiencing some technical difficulties.</p>
+    <p>Our team has been notified of this issue. Please try again later.</p>
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+</div>
+{% endblock %}

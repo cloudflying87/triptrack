@@ -1,0 +1,62 @@
+<!-- tracker/templates/tracker/maintenance_schedule_form.html -->
+{% extends 'tracker/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}TripTracker - {% if schedule %}Edit Maintenance Schedule{% else %}Add Maintenance Schedule{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">{% if schedule %}Edit Maintenance Schedule{% else %}Add New Maintenance Schedule{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% url 'maintenance_schedule_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const vehicleField = document.getElementById('id_vehicle');
+        const intervalMilesField = document.getElementById('id_interval_miles').closest('.mb-3');
+        const intervalHoursField = document.getElementById('id_interval_hours').closest('.mb-3');
+        
+        function updateFields() {
+            const vehicleId = vehicleField.value;
+            
+            if (vehicleId) {
+                fetch(`/api/vehicles/${vehicleId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.type === 'car') {
+                            intervalMilesField.style.display = 'block';
+                            intervalHoursField.style.display = 'none';
+                        } else {
+                            intervalMilesField.style.display = 'none';
+                            intervalHoursField.style.display = 'block';
+                        }
+                    });
+            }
+        }
+        
+        if (vehicleField) {
+            vehicleField.addEventListener('change', updateFields);
+            if (vehicleField.value) {
+                updateFields();
+            }
+        }
+    });
+</script>
+{% endblock %}

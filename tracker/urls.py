@@ -1,4 +1,4 @@
-# urls.py
+# tracker/urls.py
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -7,7 +7,7 @@ from . import views
 # DRF Router
 router = DefaultRouter()
 router.register(r'api/vehicles', views.VehicleViewSet, basename='vehicle-api')
-router.register(r'api/events', views.EventViewSet, basename='event-api')
+router.register(r'api/trips', views.EventViewSet, basename='trip-api')
 router.register(r'api/todos', views.TodoItemViewSet, basename='todo-api')
 
 urlpatterns = [
@@ -23,7 +23,7 @@ urlpatterns = [
     path('vehicles/<int:pk>/update/', views.vehicle_update, name='vehicle_update'),
     path('vehicles/<int:pk>/delete/', views.vehicle_delete, name='vehicle_delete'),
     
-    # Events
+    # Events (now called Trips)
     path('events/', views.event_list, name='event_list'),
     path('events/maintenance/add/', views.maintenance_create, name='maintenance_create'),
     path('events/gas/add/', views.gas_create, name='gas_create'),
@@ -55,4 +55,8 @@ urlpatterns = [
     
     # API Routes
     path('', include(router.urls)),
+    
+    # Authentication
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('accounts/register/', views.register, name='register'),
 ]

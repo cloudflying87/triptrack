@@ -1,0 +1,13 @@
+<!-- templates/404.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Page Not Found{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <h1 class="display-1">404</h1>
+    <h2>Oops! Your trip took a detour.</h2>
+    <p class="lead">We couldn't find the page you were looking for.</p>
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+</div>
+{% endblock %}

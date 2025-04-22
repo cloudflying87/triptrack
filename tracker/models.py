@@ -73,9 +73,9 @@ class MaintenanceCategory(models.Model):
         verbose_name_plural = "Maintenance Categories"
 
 
-class Trip(models.Model):
+class Event(models.Model):
     """Renamed from Event to better match the TripTracker name"""
-    TRIP_TYPES = [
+    EVENT_TYPES = [
         ('maintenance', 'Maintenance'),
         ('gas', 'Gas Fill-up'),
         ('outing', 'Outing'),
@@ -83,7 +83,7 @@ class Trip(models.Model):
     
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='trips')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trips')
-    trip_type = models.CharField(max_length=15, choices=TRIP_TYPES)
+    event_type = models.CharField(max_length=15, choices=EVENT_TYPES)
     date = models.DateField()
     notes = models.TextField(blank=True, null=True)
     
@@ -117,7 +117,7 @@ class Trip(models.Model):
             self.total_cost = self.gallons * self.price_per_gallon
         
         # Check for maintenance schedules to mark as completed
-        if self.trip_type == 'maintenance' and self.maintenance_category:
+        if self.event_type == 'maintenance' and self.maintenance_category:
             try:
                 schedules = MaintenanceSchedule.objects.filter(
                     vehicle=self.vehicle,
@@ -141,14 +141,14 @@ class Trip(models.Model):
         super().save(*args, **kwargs)
     
     def get_mpg(self):
-        if self.trip_type == 'gas' and self.miles and self.gallons:
+        if self.event_type == 'gas' and self.miles and self.gallons:
             return round(self.miles / self.gallons, 2)
         return None
     
     class Meta:
         indexes = [
             models.Index(fields=['vehicle', 'date']),
-            models.Index(fields=['trip_type']),
+            models.Index(fields=['event_type']),
             models.Index(fields=['user', 'date']),
         ]
 

@@ -1,0 +1,171 @@
+<!-- tracker/templates/tracker/maintenance_schedule_list.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Maintenance Schedules{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Maintenance Schedules</h1>
+    <a href="{% url 'maintenance_schedule_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add Schedule
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <!-- tracker/templates/tracker/maintenance_schedule_list.html (continued) -->
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Maintenance Due</h5>
+            </div>
+            <div class="card-body">
+                {% if due_schedules %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Vehicle</th>
+                                    <th>Maintenance</th>
+                                    <th>Last Performed</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for schedule in due_schedules %}
+                                    <tr>
+                                        <td>{{ schedule.vehicle.name }}</td>
+                                        <td>{{ schedule.name }}</td>
+                                        <td>
+                                            {% if schedule.last_performed %}
+                                                {{ schedule.last_performed|date:"M d, Y" }}
+                                                {% if schedule.vehicle.type == 'car' and schedule.last_miles %}
+                                                    <br><small>{{ schedule.last_miles }} miles</small>
+                                                {% elif schedule.vehicle.type != 'car' and schedule.last_hours %}
+                                                    <br><small>{{ schedule.last_hours }} hours</small>
+                                                {% endif %}
+                                            {% else %}
+                                                Never
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">Overdue</span>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'maintenance_create' %}?vehicle={{ schedule.vehicle.pk }}&maintenance_category={{ schedule.maintenance_type.pk }}" class="btn btn-sm btn-success">
+                                                <i class="bi bi-check-lg"></i> Mark Complete
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center">No maintenance is currently due.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% for vehicle, schedules in vehicle_schedules.items %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ vehicle.name }} ({{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if schedules %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Maintenance</th>
+                                        <th>Interval</th>
+                                        <th>Last Performed</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for schedule in schedules %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ schedule.name }}</strong>
+                                                {% if schedule.description %}
+                                                    <br><small>{{ schedule.description|truncatechars:50 }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if schedule.interval_miles %}
+                                                    {{ schedule.interval_miles }} miles<br>
+                                                {% endif %}
+                                                {% if schedule.interval_hours %}
+                                                    {{ schedule.interval_hours }} hours<br>
+                                                {% endif %}
+                                                {% if schedule.interval_days %}
+                                                    {{ schedule.interval_days }} days
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if schedule.last_performed %}
+                                                    {{ schedule.last_performed|date:"M d, Y" }}
+                                                    {% if vehicle.type == 'car' and schedule.last_miles %}
+                                                        <br><small>{{ schedule.last_miles }} miles</small>
+                                                    {% elif vehicle.type != 'car' and schedule.last_hours %}
+                                                        <br><small>{{ schedule.last_hours }} hours</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    Never
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if schedule.is_due %}
+                                                    <span class="badge bg-danger">Due</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">OK</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <a href="{% url 'maintenance_create' %}?vehicle={{ vehicle.pk }}&maintenance_category={{ schedule.maintenance_type.pk }}" class="btn btn-sm btn-success">
+                                                        <i class="bi bi-check-lg"></i> Mark Complete
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-center">No maintenance schedules for this vehicle.</p>
+                        <div class="text-center">
+                            <a href="{% url 'maintenance_schedule_create' %}?vehicle={{ vehicle.pk }}" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> Add Schedule
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <p class="mb-0">You haven't set up any maintenance schedules yet.</p>
+                <p>
+                    <a href="{% url 'maintenance_schedule_create' %}" class="btn btn-primary mt-3">Create your first schedule</a>
+                </p>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

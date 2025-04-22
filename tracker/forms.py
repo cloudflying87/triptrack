@@ -3,6 +3,9 @@
 from django import forms
 from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory
 from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
+
+
 class VehicleForm(forms.ModelForm):
     class Meta:
         model = Vehicle
@@ -94,3 +97,11 @@ class TodoItemForm(forms.ModelForm):
         if user:
             self.fields['vehicle'].queryset = Vehicle.objects.filter(owner=user)
             self.fields['shared_with'].queryset = User.objects.exclude(id=user.id)
+
+class UserRegisterForm(UserCreationForm):
+    """Extended user registration form with email field"""
+    email = forms.EmailField()
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password1', 'password2']
