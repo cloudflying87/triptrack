@@ -59,6 +59,8 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARED_TOKEN}
     depends_on:
       - triptracker
+    networks:
+      - default
 
 volumes:
   postgres_data:
