@@ -23,9 +23,21 @@
             </div>
         </div>
         <p class="lead">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
-        <p>
+        <div class="mb-2">
             <span class="badge bg-primary">{{ vehicle.get_type_display }}</span>
-        </p>
+        </div>
+        {% if vehicle.license_plate or vehicle.vin %}
+        <div class="card mb-2">
+            <div class="card-body p-2">
+                {% if vehicle.license_plate %}
+                <p class="mb-1"><strong>License Plate:</strong> {{ vehicle.license_plate }}</p>
+                {% endif %}
+                {% if vehicle.vin %}
+                <p class="mb-0"><strong>VIN:</strong> {{ vehicle.vin }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     <div class="col-md-4">
         {% if vehicle.image %}

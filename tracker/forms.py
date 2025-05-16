@@ -6,6 +6,47 @@ from django.utils.translation import gettext_lazy as _
 from .models import Family, Vehicle, Event, TodoItem, Location, MaintenanceSchedule
 
 
+class VehicleTypeFieldMixin:
+    """Mixin to handle vehicle type-specific field visibility"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._setup_vehicle_type_fields()
+    
+    def _setup_vehicle_type_fields(self):
+        # Add data attributes to the vehicle field for JavaScript
+        if 'vehicle' in self.fields:
+            self.fields['vehicle'].widget.attrs.update({
+                'data-toggle-fields': 'true'
+            })
+        
+        # Add data attributes to miles and hours fields if they exist
+        if 'miles' in self.fields:
+            self.fields['miles'].widget.attrs.update({
+                'data-vehicle-type': 'car',
+                'class': self.fields['miles'].widget.attrs.get('class', '') + ' vehicle-type-field'
+            })
+        
+        if 'hours' in self.fields:
+            self.fields['hours'].widget.attrs.update({
+                'data-vehicle-type': 'boat',
+                'class': self.fields['hours'].widget.attrs.get('class', '') + ' vehicle-type-field'
+            })
+            
+        # Hide inappropriate fields based on initial vehicle selection
+        if self.initial.get('vehicle'):
+            try:
+                vehicle = Vehicle.objects.get(pk=self.initial['vehicle'])
+                if vehicle.type == 'car':
+                    if 'hours' in self.fields:
+                        self.fields['hours'].widget.attrs.update({'style': 'display: none;'})
+                else:
+                    if 'miles' in self.fields:
+                        self.fields['miles'].widget.attrs.update({'style': 'display: none;'})
+            except Vehicle.DoesNotExist:
+                pass
+
+
 class FamilyForm(forms.ModelForm):
     """Form for creating and updating Family instances"""
     
@@ -178,7 +219,7 @@ class LocationForm(forms.ModelForm):
         self.fields['latitude'].help_text = 'Decimal degrees (e.g., 37.123456)'
         self.fields['longitude'].help_text = 'Decimal degrees (e.g., -122.123456)'
 
-class MaintenanceEventForm(forms.ModelForm):
+class MaintenanceEventForm(VehicleTypeFieldMixin, forms.ModelForm):
     class Meta:
         model = Event
         fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'notes']
@@ -287,14 +328,15 @@ class MaintenanceScheduleForm(forms.ModelForm):
         return cleaned_data
     
 
-class GasEventForm(forms.ModelForm):
+class GasEventForm(VehicleTypeFieldMixin, forms.ModelForm):
     class Meta:
         model = Event
-        fields = ['vehicle', 'date', 'miles', 'gallons', 'price_per_gallon', 'total_cost', 'notes']
+        fields = ['vehicle', 'date', 'miles', 'hours', 'gallons', 'price_per_gallon', 'total_cost', 'notes']
         widgets = {
             'vehicle': forms.Select(attrs={'class': 'form-select'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
+            'hours': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'gallons': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
             'price_per_gallon': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
             'total_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -308,6 +350,7 @@ class GasEventForm(forms.ModelForm):
         # Set current date as default
         self.fields['date'].initial = date.today()
         self.fields['miles'].help_text = "Current odometer reading at fill-up"
+        self.fields['hours'].help_text = "Current hour meter reading at fill-up"
         # Limit vehicle choices to vehicles in user's families
         if user:
             user_families = user.families.all()
@@ -338,7 +381,7 @@ class GasEventForm(forms.ModelForm):
         return cleaned_data
 
 
-class OutingEventForm(forms.ModelForm):
+class OutingEventForm(VehicleTypeFieldMixin, forms.ModelForm):
     class Meta:
         model = Event
         fields = ['vehicle', 'date', 'location', 'miles', 'hours', 'notes']

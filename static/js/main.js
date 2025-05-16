@@ -75,43 +75,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const vehicleTypeField = document.getElementById('id_vehicle');
     
     // Only proceed if the vehicle field exists
-    if (vehicleTypeField) {
+    if (vehicleTypeField && vehicleTypeField.hasAttribute('data-toggle-fields')) {
         const milesFieldContainer = document.getElementById('id_miles');
         const hoursFieldContainer = document.getElementById('id_hours');
         
-        // Only proceed if we have both field containers
-        if (milesFieldContainer && hoursFieldContainer) {
-            const milesField = milesFieldContainer.closest('.mb-3') || milesFieldContainer.parentElement;
-            const hoursField = hoursFieldContainer.closest('.mb-3') || hoursFieldContainer.parentElement;
+        // Function to update visible fields
+        function updateVisibleFields() {
+            const vehicleId = vehicleTypeField.value;
             
-            function updateVisibleFields() {
-                const vehicleId = vehicleTypeField.value;
-                
-                if (vehicleId) {
-                    fetch(`/api/vehicles/${vehicleId}/`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.type === 'car') {
-                                milesField.style.display = 'block';
-                                hoursField.style.display = 'none';
+            if (vehicleId) {
+                fetch(`/api/vehicles/${vehicleId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Find all vehicle-type-field elements
+                        const typeFields = document.querySelectorAll('.vehicle-type-field');
+                        
+                        typeFields.forEach(field => {
+                            const fieldVehicleType = field.getAttribute('data-vehicle-type');
+                            const fieldContainer = field.closest('.mb-3') || field.parentElement;
+                            
+                            if (fieldVehicleType === 'car' && data.type === 'car') {
+                                fieldContainer.style.display = 'block';
+                                field.removeAttribute('disabled');
+                            } else if (fieldVehicleType === 'boat' && data.type !== 'car') {
+                                fieldContainer.style.display = 'block';
+                                field.removeAttribute('disabled');
                             } else {
-                                milesField.style.display = 'none';
-                                hoursField.style.display = 'block';
+                                fieldContainer.style.display = 'none';
+                                field.setAttribute('disabled', 'disabled');
+                                field.value = '';  // Clear value when hidden
                             }
-                        })
-                        .catch(error => {
-                            console.error('Error fetching vehicle type:', error);
                         });
-                }
-            }
-            
-            vehicleTypeField.addEventListener('change', updateVisibleFields);
-            
-            // Initial call
-            if (vehicleTypeField.value) {
-                updateVisibleFields();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching vehicle type:', error);
+                    });
+            } else {
+                // No vehicle selected, show both fields
+                const typeFields = document.querySelectorAll('.vehicle-type-field');
+                typeFields.forEach(field => {
+                    const fieldContainer = field.closest('.mb-3') || field.parentElement;
+                    fieldContainer.style.display = 'block';
+                    field.removeAttribute('disabled');
+                });
             }
         }
+        
+        vehicleTypeField.addEventListener('change', updateVisibleFields);
+        
+        // Initial call
+        updateVisibleFields();
     }
     
     // Setup PWA install prompt
@@ -157,7 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Service Worker Registration
 function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
+    // Only register service worker in production (HTTPS)
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/service-worker.js')
                 .then(registration => {
@@ -170,6 +184,8 @@ function registerServiceWorker() {
                     console.error('Service Worker registration failed:', error);
                 });
         });
+    } else if ('serviceWorker' in navigator && window.location.protocol === 'http:') {
+        console.log('Service Worker not registered - running on HTTP (development)');
     }
 }
 

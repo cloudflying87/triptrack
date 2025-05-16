@@ -67,6 +67,7 @@ urlpatterns = [
     path('export/<str:type>/<int:pk>/', views.ExportDataView.as_view(), name='export_data_with_pk'),
     
     # API URLs for charts and data
+    path('api/vehicles/<int:pk>/', views.VehicleDetailAPIView.as_view(), name='vehicle_detail_api'),
     path('api/vehicle/<int:vehicle_id>/events/', views.vehicle_events_api, name='vehicle_events_api'),
     path('api/vehicle/<int:vehicle_id>/mileage/', views.vehicle_mileage_api, name='vehicle_mileage_api'),
     path('api/vehicle/<int:vehicle_id>/fuel-efficiency/', views.vehicle_fuel_efficiency_api, name='vehicle_fuel_efficiency_api'),

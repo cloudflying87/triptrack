@@ -11,6 +11,9 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 import os
 from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory, MaintenanceSchedule, Family
 from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm, 
@@ -1256,3 +1259,31 @@ class CustomLogoutView(LogoutView):
     Custom logout view that redirects to the landing page
     """
     next_page = reverse_lazy('landing_page')
+
+
+class VehicleDetailAPIView(LoginRequiredMixin, APIView):
+    """
+    API endpoint to get vehicle details (for JavaScript)
+    """
+    def get(self, request, pk):
+        try:
+            # Check if user has access to this vehicle
+            user_families = request.user.families.all()
+            vehicle = Vehicle.objects.get(pk=pk, family__in=user_families)
+            
+            # Return vehicle data
+            data = {
+                'id': vehicle.id,
+                'name': vehicle.name,
+                'type': vehicle.type,
+                'make': vehicle.make,
+                'model': vehicle.model,
+                'year': vehicle.year,
+            }
+            return Response(data)
+        
+        except Vehicle.DoesNotExist:
+            return Response(
+                {'error': 'Vehicle not found or access denied'},
+                status=status.HTTP_404_NOT_FOUND
+            )
