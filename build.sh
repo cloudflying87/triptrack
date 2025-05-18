@@ -133,8 +133,8 @@ TUNNEL_CONTAINER="triptracker_tunnel"
 if [ "$BACKUP_DATA" = true ]; then
     echo "Taking data-only SQL backup: $USER_DATE"
     mkdir -p backups
-    docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql 
-    docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql 
+    sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
     echo "Data backup completed: ./backups/triptracker_${USER_DATE}_data.sql"
     
     # SCP the backup to remote server
@@ -150,20 +150,20 @@ if [ "$BACKUP_ALL" = true ]; then
     
     # Data only backup (no schema, no migrations)
     echo "Creating data-only backup..."
-    docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
     
     # Full backup (schema + data, no drop statements)
     echo "Creating full backup..."
-    docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}.sql
     
     # Clean backup (with drop statements for clean restore)
     echo "Creating clean backup with drop statements..."
-    docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -c -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -c -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql
     
     # Copy all backups to local directory
-    docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
-    docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}.sql ./backups/
-    docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql ./backups/
+    sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
+    sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}.sql ./backups/
+    sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql ./backups/
     
     # SCP all backups to remote server
     echo "Transferring backup files to remote server"
@@ -183,15 +183,15 @@ fi
 # Full Rebuild - rebuilds all containers including database
 if [ "$REBUILD" = true ]; then
     echo "Stopping and removing all containers (including database)"
-    docker stop $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
-    docker rm $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    sudo docker stop $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    sudo docker rm $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     
     echo "Pruning unused images and volumes"
-    docker image prune -f
-    docker volume prune -f
+    sudo docker image prune -f
+    sudo docker volume prune -f
     
     echo "Starting all containers"
-    docker-compose up -d
+    sudo docker-compose up -d
     
     # Wait for database to be ready
     echo "Waiting for database to be ready..."
@@ -205,20 +205,20 @@ if [ "$SOFT_REBUILD" = true ]; then
     # First backup the database if date is provided
     if [ -n "$USER_DATE" ]; then
         echo "Taking precautionary database backup before soft rebuild"
-        docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql
-        docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql ./backups/
+        sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql
+        sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql ./backups/
         echo "Backup saved to: ./backups/triptracker_${USER_DATE}_pre_soft_rebuild.sql"
     fi
     
     echo "Stopping and removing containers (except database)"
-    docker stop $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
-    docker rm $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    sudo docker stop $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    sudo docker rm $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     
     echo "Pruning unused images (preserving database volume)"
-    docker image prune -f
+    sudo docker image prune -f
     
     echo "Starting containers (using existing database)"
-    docker-compose up -d $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER
+    sudo docker-compose up -d $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER
     
     # Wait for services to be ready
     echo "Waiting for services to be ready..."
@@ -230,11 +230,11 @@ if [ "$SETUP" = true ]; then
     echo "Running Django setup"
     
     echo "Applying database migrations..."
-    docker-compose exec $WEB_CONTAINER python manage.py makemigrations
-    docker-compose exec $WEB_CONTAINER python manage.py migrate
+    sudo docker-compose exec $WEB_CONTAINER python manage.py makemigrations
+    sudo docker-compose exec $WEB_CONTAINER python manage.py migrate
     
     echo "Collecting static files..."
-    docker-compose exec $WEB_CONTAINER python manage.py collectstatic --noinput
+    sudo docker-compose exec $WEB_CONTAINER python manage.py collectstatic --noinput
     
     echo "Django setup completed!"
 fi
@@ -257,8 +257,8 @@ if [ "$RESTORE" = true ]; then
     
     # Now restore from the backup file
     echo "Restoring from $BACKUP_FILE"
-    docker cp $BACKUP_FILE $DB_CONTAINER:/var/lib/postgresql/data/
-    docker exec -i $DB_CONTAINER psql -d ${DB_NAME:-triptracker} -U ${DB_USER:-postgres} -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
+    sudo docker cp $BACKUP_FILE $DB_CONTAINER:/var/lib/postgresql/data/
+    sudo docker exec -i $DB_CONTAINER psql -d ${DB_NAME:-triptracker} -U ${DB_USER:-postgres} -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
     echo "Database restored successfully!"
 fi
 
