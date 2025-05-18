@@ -4,9 +4,9 @@
 BACKUP_DATA=false
 BACKUP_ALL=false
 REBUILD=false
+SOFT_REBUILD=false
 RESTORE=false
-MIGRATIONS=false
-COLLECT_STATIC=false
+SETUP=false  # Combined migrations and static files
 ALL=false
 REMOTE_SERVER="davidhale87@172.16.205.4"
 REMOTE_BACKUP_DIR="/halefiles/Coding/TripTrackDBBackups"
@@ -21,17 +21,18 @@ show_help() {
     echo "  -a, --all         Run all steps"
     echo "  -b, --data        Only backup data SQL (without migrations)"
     echo "  -t, --backupall   Backup all database formats (data, full, clean)"
-    echo "  -r, --rebuild     Rebuild containers (stop, remove, prune)"
+    echo "  -r, --rebuild     Full rebuild (all containers including DB)"
+    echo "  -s, --soft        Soft rebuild (keeps DB, rebuilds other containers)"
     echo "  -o, --restore     Restore database from backup"
-    echo "  -m, --migrate     Run Django migrations"
-    echo "  -s, --static      Collect static files"
+    echo "  -u, --setup       Run Django setup (migrations + static files)"
     echo "  --remote SERVER   Remote server address for SCP (default: $REMOTE_SERVER)"
     echo "  --remote-dir DIR  Remote directory for backups (default: $REMOTE_BACKUP_DIR)"
     echo ""
     echo "Example:"
     echo "  $0 -d 2023-05-13 -b         # Backup data with date 2023-05-13"
     echo "  $0 -a -d 2023-05-13         # Run all steps with date 2023-05-13"
-    echo "  $0 -r -m -s                 # Rebuild, run migrations and collect static"
+    echo "  $0 -r -u                    # Full rebuild with Django setup"
+    echo "  $0 -s -u                    # Soft rebuild with Django setup"
 }
 
 # Parse command line arguments
@@ -61,16 +62,16 @@ while [[ $# -gt 0 ]]; do
             REBUILD=true
             shift
             ;;
+        -s|--soft)
+            SOFT_REBUILD=true
+            shift
+            ;;
         -o|--restore)
             RESTORE=true
             shift
             ;;
-        -m|--migrate)
-            MIGRATIONS=true
-            shift
-            ;;
-        -s|--static)
-            COLLECT_STATIC=true
+        -u|--setup)
+            SETUP=true
             shift
             ;;
         --remote)
@@ -94,8 +95,7 @@ if [ "$ALL" = true ]; then
     BACKUP_ALL=true
     REBUILD=true
     RESTORE=true
-    MIGRATIONS=true
-    COLLECT_STATIC=true
+    SETUP=true
 fi
 
 # Check if date is provided when needed
@@ -115,10 +115,10 @@ echo "Running build with the following options:"
 echo "Date: $USER_DATE"
 echo "Backup Data Only: $BACKUP_DATA"
 echo "Backup All: $BACKUP_ALL"
-echo "Rebuild: $REBUILD"
+echo "Full Rebuild: $REBUILD"
+echo "Soft Rebuild: $SOFT_REBUILD"
 echo "Restore: $RESTORE"
-echo "Run Migrations: $MIGRATIONS"
-echo "Collect Static: $COLLECT_STATIC"
+echo "Django Setup: $SETUP"
 echo "Remote Server: $REMOTE_SERVER"
 echo "Remote Backup Directory: $REMOTE_BACKUP_DIR"
 echo "-----------------------------------"
@@ -180,9 +180,9 @@ if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     git pull
 fi
 
-# Rebuild containers
+# Full Rebuild - rebuilds all containers including database
 if [ "$REBUILD" = true ]; then
-    echo "Stopping and removing containers"
+    echo "Stopping and removing all containers (including database)"
     docker stop $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     docker rm $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     
@@ -190,7 +190,7 @@ if [ "$REBUILD" = true ]; then
     docker image prune -f
     docker volume prune -f
     
-    echo "Starting containers"
+    echo "Starting all containers"
     docker-compose up -d
     
     # Wait for database to be ready
@@ -198,17 +198,45 @@ if [ "$REBUILD" = true ]; then
     sleep 10
 fi
 
-# Run migrations
-if [ "$MIGRATIONS" = true ]; then
-    echo "Running Django migrations"
-    docker-compose exec $WEB_CONTAINER python manage.py makemigrations
-    docker-compose exec $WEB_CONTAINER python manage.py migrate
+# Soft Rebuild - rebuilds all containers except database
+if [ "$SOFT_REBUILD" = true ]; then
+    echo "Performing soft rebuild (keeping database)"
+    
+    # First backup the database if date is provided
+    if [ -n "$USER_DATE" ]; then
+        echo "Taking precautionary database backup before soft rebuild"
+        docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql
+        docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql ./backups/
+        echo "Backup saved to: ./backups/triptracker_${USER_DATE}_pre_soft_rebuild.sql"
+    fi
+    
+    echo "Stopping and removing containers (except database)"
+    docker stop $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    docker rm $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
+    
+    echo "Pruning unused images (preserving database volume)"
+    docker image prune -f
+    
+    echo "Starting containers (using existing database)"
+    docker-compose up -d $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER
+    
+    # Wait for services to be ready
+    echo "Waiting for services to be ready..."
+    sleep 5
 fi
 
-# Collect static files
-if [ "$COLLECT_STATIC" = true ]; then
-    echo "Collecting static files"
+# Run Django setup (migrations + static files)
+if [ "$SETUP" = true ]; then
+    echo "Running Django setup"
+    
+    echo "Applying database migrations..."
+    docker-compose exec $WEB_CONTAINER python manage.py makemigrations
+    docker-compose exec $WEB_CONTAINER python manage.py migrate
+    
+    echo "Collecting static files..."
     docker-compose exec $WEB_CONTAINER python manage.py collectstatic --noinput
+    
+    echo "Django setup completed!"
 fi
 
 # Restore database

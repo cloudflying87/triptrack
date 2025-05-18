@@ -1,0 +1,150 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/dashboard.css" %}">{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="app-tracker module">
+    <h2>TripTracker Quick Stats</h2>
+    <div class="module">
+      <table>
+        <caption>System Overview</caption>
+        <tbody>
+          <tr>
+            <th scope="row">Total Families</th>
+            <td>{{ total_families|default:"0" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Total Vehicles</th>
+            <td>{{ total_vehicles|default:"0" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Total Events</th>
+            <td>{{ total_events|default:"0" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Active To-Dos</th>
+            <td>{{ active_todos|default:"0" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Maintenance Due</th>
+            <td class="{% if maintenance_due > 0 %}maintenance-due{% else %}maintenance-ok{% endif %}">
+              {{ maintenance_due|default:"0" }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="module">
+    <table>
+      <caption>
+        <a href="/admin/tracker/event/" class="section" title="Events">Recent Events</a>
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Vehicle</th>
+          <th scope="col">Type</th>
+          <th scope="col">Date</th>
+          <th scope="col">Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in recent_events %}
+        <tr>
+          <td><a href="/admin/tracker/event/{{ event.id }}/change/">{{ event.vehicle }}</a></td>
+          <td>{{ event.get_event_type_display }}</td>
+          <td>{{ event.date }}</td>
+          <td>${{ event.total_cost|floatformat:2|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No recent events</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if app_list %}
+    {% for app in app_list %}
+      <div class="app-{{ app.app_label }} module{% if app.app_url in request.path %} current-app{% endif %}">
+        <table>
+          <caption>
+            <a href="{{ app.app_url }}" class="section" title="{% blocktrans with name=app.name %}Models in the {{ name }} application{% endblocktrans %}">{{ app.name }}</a>
+          </caption>
+          {% for model in app.models %}
+            <tr class="model-{{ model.object_name|lower }}{% if model.admin_url in request.path %} current-model{% endif %}">
+              {% if model.admin_url %}
+                <th scope="row"><a href="{{ model.admin_url }}">{{ model.name }}</a></th>
+              {% else %}
+                <th scope="row">{{ model.name }}</th>
+              {% endif %}
+
+              {% if model.add_url %}
+                <td><a href="{{ model.add_url }}" class="addlink">{% trans 'Add' %}</a></td>
+              {% else %}
+                <td>&nbsp;</td>
+              {% endif %}
+
+              {% if model.admin_url and show_changelinks %}
+                {% if model.view_only %}
+                  <td><a href="{{ model.admin_url }}" class="viewlink">{% trans 'View' %}</a></td>
+                {% else %}
+                  <td><a href="{{ model.admin_url }}" class="changelink">{% trans 'Change' %}</a></td>
+                {% endif %}
+              {% else %}
+                <td>&nbsp;</td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>{% trans 'You don't have permission to view or edit anything.' %}</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+  <div class="module" id="recent-actions-module">
+    <h2>{% trans 'Recent actions' %}</h2>
+    <h3>{% trans 'My actions' %}</h3>
+      {% load log %}
+      {% get_admin_log 10 as admin_log for_user user %}
+      {% if not admin_log %}
+      <p>{% trans 'None available' %}</p>
+      {% else %}
+      <ul class="actionlist">
+        {% for entry in admin_log %}
+        <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+          {% if entry.is_deletion or not entry.get_admin_url %}
+            {{ entry.object_repr }}
+          {% else %}
+            <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+          {% endif %}
+          <br>
+          {% if entry.content_type %}
+            <span class="mini quiet">{{ entry.content_type }}</span>
+          {% else %}
+            <span class="mini quiet">{% trans 'Unknown content' %}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+  </div>
+</div>
+{% endblock %}
