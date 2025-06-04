@@ -15,7 +15,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-dev-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
-print(f"DEBUG mode is set to: {DEBUG}")
+
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'triptrack.flyhomemnlab.com,localhost,127.0.0.1').split(',')
 CSRF_TRUSTED_ORIGINS = ['https://triptrack.flyhomemnlab.com']
 
