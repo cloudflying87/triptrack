@@ -209,6 +209,9 @@ if [ "$REBUILD" = true ]; then
     # Wait for database to be ready
     echo "Waiting for database to be ready..."
     sleep 10
+    sudo docker compose exec triptracker python manage.py collectstatic --noinput
+    sudo docker compose exec triptracker python manage.py makemigrations
+    sudo docker compose exec triptracker python manage.py migrate
 fi
 
 # Soft Rebuild - rebuilds all containers except database

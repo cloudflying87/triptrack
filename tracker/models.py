@@ -117,6 +117,7 @@ class Event(models.Model):
     price_per_gallon = models.DecimalField(max_digits=5, decimal_places=3, null=True, blank=True)
     total_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     milespergallon = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    gallonsperhour = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     
     # Maintenance specific fields
     maintenance_category = models.ForeignKey(MaintenanceCategory, on_delete=models.SET_NULL, 
@@ -136,30 +137,52 @@ class Event(models.Model):
         if self.gallons and self.price_per_gallon and not self.total_cost:
             self.total_cost = self.gallons * self.price_per_gallon
         
-        # Calculate MPG for gas fill-ups
-        if self.event_type == 'gas' and self.gallons and self.miles and self.gallons > 0:
-            # Get the previous gas event for this vehicle
-            prev_event = Event.objects.filter(
-                vehicle=self.vehicle,
-                event_type='gas',
-                date__lt=self.date  # Events before this one
-            ).order_by('-date').first()
-            
-            # Calculate distance driven
-            if prev_event and prev_event.miles:
-                # Miles driven since last fill-up
-                miles_driven = self.miles - prev_event.miles
-            else:
-                # If no previous gas event, use starting_mileage if available
-                if self.vehicle.starting_mileage:
-                    miles_driven = self.miles - self.vehicle.starting_mileage
+        # Calculate MPG for gas fill-ups (cars) or gallons per hour (boats/other)
+        if self.event_type == 'gas' and self.gallons and self.gallons > 0:
+            if self.vehicle.type == 'car' and self.miles:
+                # Calculate MPG for cars
+                prev_event = Event.objects.filter(
+                    vehicle=self.vehicle,
+                    event_type='gas',
+                    date__lt=self.date  # Events before this one
+                ).order_by('-date').first()
+                
+                # Calculate distance driven
+                if prev_event and prev_event.miles:
+                    # Miles driven since last fill-up
+                    miles_driven = self.miles - prev_event.miles
                 else:
-                    # Fallback to current miles value if we can't calculate difference
-                    miles_driven = self.miles
-            
-            # Calculate MPG
-            if miles_driven > 0:
-                self.milespergallon = round(miles_driven / self.gallons, 2)
+                    # If no previous gas event, use starting_mileage if available
+                    if self.vehicle.starting_mileage:
+                        miles_driven = self.miles - self.vehicle.starting_mileage
+                    else:
+                        # Fallback to current miles value if we can't calculate difference
+                        miles_driven = self.miles
+                
+                # Calculate MPG
+                if miles_driven > 0:
+                    self.milespergallon = round(miles_driven / self.gallons, 2)
+                    
+            elif self.vehicle.type != 'car' and self.hours:
+                # Calculate gallons per hour for boats/other vehicles
+                prev_event = Event.objects.filter(
+                    vehicle=self.vehicle,
+                    event_type='gas',
+                    date__lt=self.date  # Events before this one
+                ).order_by('-date').first()
+                
+                # Calculate hours run
+                if prev_event and prev_event.hours:
+                    # Hours run since last fill-up
+                    hours_run = self.hours - prev_event.hours
+                else:
+                    # If no previous gas event, we can't calculate consumption rate
+                    # For first fill-up on hour-based vehicles, we need at least two data points
+                    hours_run = 0
+                
+                # Calculate gallons per hour
+                if hours_run > 0:
+                    self.gallonsperhour = round(self.gallons / hours_run, 2)
         
         # Check for maintenance schedules to mark as completed
         if self.event_type == 'maintenance' and self.maintenance_category:
@@ -194,6 +217,24 @@ class Event(models.Model):
             elif self.miles:
                 return round(self.miles / self.gallons, 2)
         return None
+    
+    def get_efficiency(self):
+        """Get efficiency metric based on vehicle type: MPG for cars, GPH for boats/other"""
+        if self.event_type == 'gas' and self.gallons and self.gallons > 0:
+            if self.vehicle.type == 'car':
+                return self.get_mpg()
+            else:
+                # Return gallons per hour for boats/other vehicles
+                if self.gallonsperhour:
+                    return self.gallonsperhour
+        return None
+    
+    def get_efficiency_unit(self):
+        """Get the efficiency unit based on vehicle type"""
+        if self.vehicle.type == 'car':
+            return 'MPG'
+        else:
+            return 'GPH'
     
     class Meta:
         indexes = [
