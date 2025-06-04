@@ -8,14 +8,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
 load_dotenv()
-print(os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes'])
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-dev-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
-
+print(f"DEBUG mode is set to: {DEBUG}")
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'triptrack.flyhomemnlab.com,localhost,127.0.0.1').split(',')
 CSRF_TRUSTED_ORIGINS = ['https://triptrack.flyhomemnlab.com']
 

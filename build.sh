@@ -123,11 +123,24 @@ echo "Remote Server: $REMOTE_SERVER"
 echo "Remote Backup Directory: $REMOTE_BACKUP_DIR"
 echo "-----------------------------------"
 
-# Docker container names - update these to match your environment
-DB_CONTAINER="triptracker_db"
-WEB_CONTAINER="triptracker"
-REDIS_CONTAINER="triptracker_redis"
-TUNNEL_CONTAINER="triptracker_tunnel"
+# Determine the Docker Compose project name
+# If not explicitly set, docker compose uses the directory name
+PROJECT_DIR=$(pwd)
+PROJECT_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+
+# Docker container names - these will be prefixed with the compose project name
+DB_CONTAINER="${PROJECT_NAME}-triptracker_db-1"
+WEB_CONTAINER="${PROJECT_NAME}-triptracker-1"
+REDIS_CONTAINER="${PROJECT_NAME}-triptracker_redis-1"
+TUNNEL_CONTAINER="${PROJECT_NAME}-triptracker_tunnel-1"
+
+echo "Using project name: $PROJECT_NAME"
+echo "Container names:"
+echo "  DB:      $DB_CONTAINER"
+echo "  Web:     $WEB_CONTAINER"
+echo "  Redis:   $REDIS_CONTAINER"
+echo "  Tunnel:  $TUNNEL_CONTAINER"
+echo "-----------------------------------"
 
 # Backup database (data only - no schema or migrations)
 if [ "$BACKUP_DATA" = true ]; then
@@ -191,7 +204,7 @@ if [ "$REBUILD" = true ]; then
     sudo docker volume prune -f
     
     echo "Starting all containers"
-    sudo docker-compose up -d
+    sudo docker compose up -d
     
     # Wait for database to be ready
     echo "Waiting for database to be ready..."
@@ -218,7 +231,7 @@ if [ "$SOFT_REBUILD" = true ]; then
     sudo docker image prune -f
     
     echo "Starting containers (using existing database)"
-    sudo docker-compose up -d $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER
+    sudo docker compose up -d triptracker triptracker_redis triptracker_tunnel
     
     # Wait for services to be ready
     echo "Waiting for services to be ready..."
@@ -230,11 +243,11 @@ if [ "$SETUP" = true ]; then
     echo "Running Django setup"
     
     echo "Applying database migrations..."
-    sudo docker-compose exec $WEB_CONTAINER python manage.py makemigrations
-    sudo docker-compose exec $WEB_CONTAINER python manage.py migrate
+    sudo docker compose exec triptracker python manage.py makemigrations
+    sudo docker compose exec triptracker python manage.py migrate
     
     echo "Collecting static files..."
-    sudo docker-compose exec $WEB_CONTAINER python manage.py collectstatic --noinput
+    sudo docker compose exec triptracker python manage.py collectstatic --noinput
     
     echo "Django setup completed!"
 fi

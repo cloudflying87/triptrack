@@ -1199,7 +1199,7 @@ def service_worker(request):
     """View for service worker script"""
     
     path = os.path.join(settings.BASE_DIR, 'static/service-worker.js')
-    print
+    
     with open(path, 'r') as sw_file:
         content = sw_file.read()
     
