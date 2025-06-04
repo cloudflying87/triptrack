@@ -4,7 +4,7 @@
 *.pyc
 jsonbackup/
 **/fixtures
-**/migrations
+.ds_store
 /airline/credentials.json
 credentials.json
 /airline/token.json
