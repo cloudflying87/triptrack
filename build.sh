@@ -221,7 +221,7 @@ if [ "$SOFT_REBUILD" = true ]; then
     # First backup the database if date is provided
     if [ -n "$USER_DATE" ]; then
         echo "Taking precautionary database backup before soft rebuild"
-        sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql
+        sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-triptracker_db_user} ${DB_NAME:-triptracker_db} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql
         sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_pre_soft_rebuild.sql ./backups/
         echo "Backup saved to: ./backups/triptracker_${USER_DATE}_pre_soft_rebuild.sql"
     fi
@@ -234,7 +234,7 @@ if [ "$SOFT_REBUILD" = true ]; then
     sudo docker image prune -f
     
     echo "Starting containers (using existing database)"
-    sudo docker compose up -d triptracker triptracker_redis triptracker_tunnel
+    sudo docker compose up -d triptracker triptracker_redis triptracker_tunnel --no-cache
     
     # Wait for services to be ready
     echo "Waiting for services to be ready..."
