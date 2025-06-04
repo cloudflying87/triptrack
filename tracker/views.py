@@ -1215,20 +1215,24 @@ def health_check(request):
     
     # Check database connection
     db_ok = True
+    db_error = None
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
-    except Exception:
+    except Exception as e:
         db_ok = False
+        db_error = str(e)
     
     # Check Redis connection
     redis_ok = True
+    redis_error = None
     try:
         redis_client = Redis.from_url(settings.CACHES['default']['LOCATION'])
         redis_client.ping()
-    except Exception:
+    except Exception as e:
         redis_ok = False
+        redis_error = str(e)
     
     status = db_ok and redis_ok
     
@@ -1237,9 +1241,58 @@ def health_check(request):
         'database': 'ok' if db_ok else 'error',
         'cache': 'ok' if redis_ok else 'error',
         'hostname': socket.gethostname(),
+        'debug': settings.DEBUG,
     }
     
+    # Include error details if something is wrong
+    if not db_ok:
+        data['database_error'] = db_error
+    if not redis_ok:
+        data['cache_error'] = redis_error
+    
     return JsonResponse(data, status=200 if status else 500)
+
+def debug_info(request):
+    """Debug information view - only accessible to superusers"""
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
+    from django.conf import settings
+    import sys
+    import os
+    
+    data = {
+        'debug': settings.DEBUG,
+        'python_version': sys.version,
+        'django_version': __import__('django').get_version(),
+        'allowed_hosts': settings.ALLOWED_HOSTS,
+        'database_url': os.environ.get('DATABASE_URL', 'Not set'),
+        'redis_url': os.environ.get('REDIS_URL', 'Not set'),
+        'environment_vars': {
+            'DEBUG': os.environ.get('DEBUG'),
+            'SECRET_KEY': 'SET' if os.environ.get('SECRET_KEY') else 'NOT SET',
+            'ALLOWED_HOSTS': os.environ.get('ALLOWED_HOSTS'),
+        },
+        'migrations_status': {},
+    }
+    
+    # Check migration status
+    from django.core.management import execute_from_command_line
+    from io import StringIO
+    import sys
+    
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        execute_from_command_line(['manage.py', 'showmigrations', '--verbosity=0'])
+        migration_output = sys.stdout.getvalue()
+        data['migrations_output'] = migration_output
+    except Exception as e:
+        data['migrations_error'] = str(e)
+    finally:
+        sys.stdout = old_stdout
+    
+    return JsonResponse(data, json_dumps_params={'indent': 2})
 
 class LandingPageView(TemplateView):
     """

@@ -8,7 +8,16 @@
     <h1 class="display-1">500</h1>
     <h2>Oops! Engine trouble.</h2>
     <p class="lead">We're experiencing some technical difficulties.</p>
-    <p>Our team has been notified of this issue. Please try again later.</p>
-    <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+    <p>This could be due to:</p>
+    <ul class="list-unstyled text-muted">
+        <li>• Database connection issues</li>
+        <li>• Missing data or configuration</li>
+        <li>• Server maintenance</li>
+    </ul>
+    <p>Please try again in a few minutes. If the problem persists, contact support.</p>
+    <div class="mt-4">
+        <a href="javascript:history.back()" class="btn btn-secondary me-2">Go Back</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+    </div>
 </div>
 {% endblock %}

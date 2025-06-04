@@ -72,8 +72,9 @@ urlpatterns = [
     path('api/vehicle/<int:vehicle_id>/mileage/', views.vehicle_mileage_api, name='vehicle_mileage_api'),
     path('api/vehicle/<int:vehicle_id>/fuel-efficiency/', views.vehicle_fuel_efficiency_api, name='vehicle_fuel_efficiency_api'),
     
-    # Health check
+    # Health check and debug info
     path('health/', views.health_check, name='health_check'),
+    path('debug/', views.debug_info, name='debug_info'),
     
     # Authentication
     path('accounts/', include('django.contrib.auth.urls')),

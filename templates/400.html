@@ -1,0 +1,17 @@
+<!-- templates/400.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Bad Request{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <h1 class="display-1">400</h1>
+    <h2>Oops! Wrong route taken.</h2>
+    <p class="lead">There was something wrong with your request.</p>
+    <p>Please check your input and try again, or go back to the dashboard.</p>
+    <div class="mt-4">
+        <a href="javascript:history.back()" class="btn btn-secondary me-2">Go Back</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

@@ -9,7 +9,7 @@ services:
     environment:
       - DEBUG=${DEBUG}
       - SECRET_KEY=${SECRET_KEY}
-      - ALLOWED_HOSTS=tracking.flyhomemnlab.com,localhost,127.0.0.1
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-triptrack.flyhomemnlab.com,localhost,127.0.0.1,localhost:8000}
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@triptracker_db:5432/${DB_NAME}
       - REDIS_URL=redis://triptracker_redis:6379/1
     ports:
