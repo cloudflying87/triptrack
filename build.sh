@@ -204,7 +204,7 @@ if [ "$REBUILD" = true ]; then
     sudo docker volume prune -f
     
     echo "Starting all containers"
-    sudo docker compose up -d
+    sudo docker compose up -d --no-cache
     
     # Wait for database to be ready
     echo "Waiting for database to be ready..."
@@ -271,7 +271,7 @@ if [ "$RESTORE" = true ]; then
     # Now restore from the backup file
     echo "Restoring from $BACKUP_FILE"
     sudo docker cp $BACKUP_FILE $DB_CONTAINER:/var/lib/postgresql/data/
-    sudo docker exec -i $DB_CONTAINER psql -d ${DB_NAME:-triptracker} -U ${DB_USER:-postgres} -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
+    sudo docker exec -i $DB_CONTAINER psql -d ${DB_NAME:-triptracker_db} -U ${DB_USER:-triptracker_db_user} -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
     echo "Database restored successfully!"
 fi
 
