@@ -204,11 +204,18 @@ if [ "$REBUILD" = true ]; then
     sudo docker volume prune -f
     
     echo "Starting all containers"
-    sudo docker compose up -d --no-cache
+    sudo docker compose up -d --build
     
     # Wait for database to be ready
     echo "Waiting for database to be ready..."
     sleep 10
+    
+    # Check if containers are running before attempting to execute commands
+    while ! sudo docker compose exec triptracker echo "Container is ready" > /dev/null 2>&1; do
+        echo "Waiting for triptracker container to be ready..."
+        sleep 5
+    done
+    
     sudo docker compose exec triptracker python manage.py collectstatic --noinput
     sudo docker compose exec triptracker python manage.py makemigrations
     sudo docker compose exec triptracker python manage.py migrate
@@ -234,7 +241,7 @@ if [ "$SOFT_REBUILD" = true ]; then
     sudo docker image prune -f
     
     echo "Starting containers (using existing database)"
-    sudo docker compose up -d triptracker triptracker_redis triptracker_tunnel --no-cache
+    sudo docker compose up -d triptracker triptracker_redis triptracker_tunnel --build
     
     # Wait for services to be ready
     echo "Waiting for services to be ready..."
@@ -258,6 +265,10 @@ fi
 # Restore database
 if [ "$RESTORE" = true ]; then
     echo "Restoring database from backup"
+    
+    # Ensure backups directory exists
+    mkdir -p backups
+    
     # First check if file exists locally
     if [ -f "./backups/triptracker_${USER_DATE}_data.sql" ]; then
         BACKUP_FILE="./backups/triptracker_${USER_DATE}_data.sql"
