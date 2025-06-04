@@ -146,7 +146,7 @@ echo "-----------------------------------"
 if [ "$BACKUP_DATA" = true ]; then
     echo "Taking data-only SQL backup: $USER_DATE"
     mkdir -p backups
-    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql 
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-triptracker_db_user} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql 
     sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
     echo "Data backup completed: ./backups/triptracker_${USER_DATE}_data.sql"
     
@@ -163,15 +163,15 @@ if [ "$BACKUP_ALL" = true ]; then
     
     # Data only backup (no schema, no migrations)
     echo "Creating data-only backup..."
-    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-triptracker_db_user} ${DB_NAME:-triptracker} -a -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql
     
     # Full backup (schema + data, no drop statements)
     echo "Creating full backup..."
-    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-triptracker_db_user} ${DB_NAME:-triptracker} -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}.sql
     
     # Clean backup (with drop statements for clean restore)
     echo "Creating clean backup with drop statements..."
-    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-postgres} ${DB_NAME:-triptracker} -c -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql
+    sudo docker exec -i $DB_CONTAINER pg_dump -U ${DB_USER:-triptracker_db_user} ${DB_NAME:-triptracker} -c -O -T django_migrations -f /var/lib/postgresql/data/triptracker_${USER_DATE}_clean.sql
     
     # Copy all backups to local directory
     sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/triptracker_${USER_DATE}_data.sql ./backups/
