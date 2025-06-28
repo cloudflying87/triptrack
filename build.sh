@@ -108,8 +108,8 @@ backup_database() {
         pg_dump $DB_NAME -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}.sql
         pg_dump $DB_NAME -c -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}_clean.sql
         
-        # Check file sizes and remove files smaller than 1MB
-        min_size=1048576
+        # Check file sizes and remove files smaller than 10KB
+        min_size=10240
         valid_backups=()
         
         for suffix in "_data.sql" ".sql" "_clean.sql"; do
@@ -147,8 +147,8 @@ backup_database() {
         sudo docker exec -it $DB_CONTAINER pg_dump -U $DB_USER $DB_NAME -O --format=plain --file=/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}.sql
         sudo docker exec -it $DB_CONTAINER pg_dump -U $DB_USER $DB_NAME -c -O --format=plain --file=/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}_clean.sql
         
-        # Check file sizes and only copy files larger than 1MB (1048576 bytes)
-        min_size=1048576
+        # Check file sizes and only copy files larger than 10KB (10240 bytes)
+        min_size=10240
         
         for suffix in "_data.sql" ".sql" "_clean.sql"; do
             filename="${PROJECT_NAME}_backup_${backup_date}${suffix}"
