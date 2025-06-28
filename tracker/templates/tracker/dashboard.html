@@ -50,10 +50,10 @@
     <div class="col-md-3 mb-3">
         <div class="card dashboard-card bg-primary text-white">
             <div class="card-body text-center">
-                <i class="bi bi-people-fill dashboard-icon"></i>
-                <h3 class="card-title">{{ family_count }}</h3>
-                <p class="card-text">Families</p>
-                <a href="{% url 'family_list' %}" class="btn btn-outline-light btn-sm">View All</a>
+                <i class="bi bi-geo-alt-fill dashboard-icon"></i>
+                <h3 class="card-title">{{ outing_count }}</h3>
+                <p class="card-text">Outings (30 days)</p>
+                <a href="{% url 'event_list' %}?type=outing" class="btn btn-outline-light btn-sm">View All</a>
             </div>
         </div>
     </div>

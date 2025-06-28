@@ -222,13 +222,14 @@ class LocationForm(forms.ModelForm):
 class MaintenanceEventForm(VehicleTypeFieldMixin, forms.ModelForm):
     class Meta:
         model = Event
-        fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'notes']
+        fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'total_cost', 'notes']
         widgets = {
             'vehicle': forms.Select(attrs={'class': 'form-select'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'maintenance_category': forms.Select(attrs={'class': 'form-select'}),
             'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
             'hours': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'e.g., 29.99'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 

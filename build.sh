@@ -15,9 +15,10 @@ REMOTE_BACKUP_DIR="/halefiles/Coding/TripTrackDBBackups"
 
 # Project specific settings
 PROJECT_NAME="triptrack"
-DB_CONTAINER="${PROJECT_NAME}-db-1"
-WEB_CONTAINER="${PROJECT_NAME}-web-1"
-NGINX_CONTAINER="${PROJECT_NAME}-nginx-1"
+DB_CONTAINER="${PROJECT_NAME}-triptracker_db-1"
+WEB_CONTAINER="${PROJECT_NAME}-triptracker-1"
+REDIS_CONTAINER="${PROJECT_NAME}-triptracker_redis-1"
+TUNNEL_CONTAINER="${PROJECT_NAME}-triptracker_tunnel-1"
 DB_NAME="triptrack"
 DB_USER="postgres"
 
@@ -78,16 +79,16 @@ run_migrations() {
     
     # Collect static files
     echo "Collecting static files..."
-    sudo docker compose exec web python manage.py collectstatic --noinput --clear
+    sudo docker compose exec triptracker python manage.py collectstatic --noinput --clear
     echo "✓ Static files collected"
     
     # Make migrations for all apps
     echo "Checking for new migrations..."
-    sudo docker compose exec web python manage.py makemigrations
+    sudo docker compose exec triptracker python manage.py makemigrations
     
     # Apply all migrations
     echo "Applying database migrations..."
-    sudo docker compose exec web python manage.py migrate
+    sudo docker compose exec triptracker python manage.py migrate
     echo "✓ Migrations completed"
 }
 
@@ -100,16 +101,42 @@ backup_database() {
     
     if [ "$is_local" = true ]; then
         # Local backup without Docker
-        pg_dump $DB_NAME -a -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}_data.sql
-        pg_dump $DB_NAME -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}.sql
-        pg_dump $DB_NAME -c -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}_clean.sql
+        LOCAL_BACKUP_DIR="/Users/davidhale87/Coding/TripTrackDBBackups"
+        mkdir -p "$LOCAL_BACKUP_DIR"
         
-        echo "Local backup completed"
+        pg_dump $DB_NAME -a -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}_data.sql
+        pg_dump $DB_NAME -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}.sql
+        pg_dump $DB_NAME -c -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}_clean.sql
+        
+        # Check file sizes and remove files smaller than 1MB
+        min_size=1048576
+        valid_backups=()
+        
+        for suffix in "_data.sql" ".sql" "_clean.sql"; do
+            filename="${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}${suffix}"
+            
+            if [ -f "$filename" ]; then
+                file_size=$(stat -c%s "$filename" 2>/dev/null || echo "0")
+                
+                if [ "$file_size" -gt "$min_size" ]; then
+                    echo "✓ Valid backup: $(basename "$filename") (${file_size} bytes)"
+                    valid_backups+=("$filename")
+                else
+                    echo "⚠ Removing small backup: $(basename "$filename") (${file_size} bytes, minimum: ${min_size})"
+                    rm -f "$filename"
+                fi
+            fi
+        done
+        
+        echo "Local backup completed - ${#valid_backups[@]} valid files"
         
         # Copy to remote if configured
-        if [ -n "$REMOTE_SERVER" ]; then
-            echo "Copying to remote server..."
-            scp /Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}*.sql $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
+        if [ -n "$REMOTE_SERVER" ] && [ ${#valid_backups[@]} -gt 0 ]; then
+            echo "Copying valid backups to remote server..."
+            for backup_file in "${valid_backups[@]}"; do
+                echo "  Uploading $(basename "$backup_file")"
+                scp "$backup_file" $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
+            done
         fi
     else
         # Docker backup
@@ -120,15 +147,35 @@ backup_database() {
         sudo docker exec -it $DB_CONTAINER pg_dump -U $DB_USER $DB_NAME -O --format=plain --file=/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}.sql
         sudo docker exec -it $DB_CONTAINER pg_dump -U $DB_USER $DB_NAME -c -O --format=plain --file=/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}_clean.sql
         
-        # Copy from container to host
-        sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}_data.sql ./backups/
-        sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}.sql ./backups/
-        sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/${PROJECT_NAME}_backup_${backup_date}_clean.sql ./backups/
+        # Check file sizes and only copy files larger than 1MB (1048576 bytes)
+        min_size=1048576
+        
+        for suffix in "_data.sql" ".sql" "_clean.sql"; do
+            filename="${PROJECT_NAME}_backup_${backup_date}${suffix}"
+            
+            # Get file size from within container
+            file_size=$(sudo docker exec $DB_CONTAINER stat -c%s /var/lib/postgresql/data/$filename 2>/dev/null || echo "0")
+            
+            if [ "$file_size" -gt "$min_size" ]; then
+                echo "✓ Copying $filename (${file_size} bytes)"
+                sudo docker cp $DB_CONTAINER:/var/lib/postgresql/data/$filename ./backups/
+            else
+                echo "⚠ Skipping $filename - too small (${file_size} bytes, minimum: ${min_size})"
+                # Clean up small backup file from container
+                sudo docker exec $DB_CONTAINER rm -f /var/lib/postgresql/data/$filename
+            fi
+        done
         
         # Copy to remote if configured
         if [ -n "$REMOTE_SERVER" ]; then
-            echo "Copying to remote server..."
-            scp ./backups/${PROJECT_NAME}_backup_${backup_date}*.sql $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
+            echo "Copying valid backups to remote server..."
+            # Only copy files that exist in the backups directory
+            for backup_file in ./backups/${PROJECT_NAME}_backup_${backup_date}*.sql; do
+                if [ -f "$backup_file" ]; then
+                    echo "  Uploading $(basename "$backup_file")"
+                    scp "$backup_file" $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
+                fi
+            done
         fi
     fi
 }
@@ -215,10 +262,10 @@ stop_containers() {
     echo "Stopping containers..."
     if [ "$keep_database" = true ]; then
         echo "Keeping database container running"
-        sudo docker stop $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        sudo docker stop $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     else
         echo "Stopping all containers including database"
-        sudo docker stop $DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        sudo docker stop $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     fi
 }
 
@@ -229,10 +276,10 @@ remove_containers() {
     echo "Removing containers..."
     if [ "$keep_database" = true ]; then
         echo "Keeping database container"
-        sudo docker rm $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        sudo docker rm $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     else
         echo "Removing all containers including database"
-        sudo docker rm $DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        sudo docker rm $DB_CONTAINER $WEB_CONTAINER $REDIS_CONTAINER $TUNNEL_CONTAINER 2>/dev/null || true
     fi
 }
 

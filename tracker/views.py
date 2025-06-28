@@ -89,8 +89,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             date__gte=thirty_days_ago
         ).aggregate(total=Sum('total_cost'))['total'] or 0
         
+        # Count outings in last 30 days
+        outing_count = Event.objects.filter(
+            vehicle__in=vehicles,
+            event_type='outing',
+            date__gte=thirty_days_ago
+        ).count()
+        
         context['maintenance_cost'] = maintenance_cost
         context['gas_cost'] = gas_cost
+        context['outing_count'] = outing_count
         context['total_cost'] = maintenance_cost + gas_cost
         
         # Get events by type for pie chart
