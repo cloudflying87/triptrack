@@ -690,6 +690,14 @@ class LocationDetailView(LoginRequiredMixin, DetailView):
         # Get all locations in families the user belongs to
         user_families = self.request.user.families.all()
         return Location.objects.filter(family__in=user_families)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Get all events at this location
+        context['events'] = Event.objects.filter(
+            location=self.object
+        ).order_by('-date')[:20]  # Show last 20 events
+        return context
 
 class LocationCreateView(LoginRequiredMixin, CreateView):
     model = Location

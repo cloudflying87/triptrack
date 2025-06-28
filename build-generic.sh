@@ -1,6 +1,33 @@
 #!/bin/bash
 
-# Default values
+# ==============================================================================
+# GENERIC BUILD SCRIPT TEMPLATE
+# ==============================================================================
+# This is a generic build script that can be used for any Django/Docker project
+# Copy this file to your project and update the PROJECT CONFIGURATION section
+# ==============================================================================
+
+# ==============================================================================
+# PROJECT CONFIGURATION - UPDATE THESE FOR YOUR PROJECT
+# ==============================================================================
+PROJECT_NAME="myproject"                                    # Your project name (lowercase)
+DB_NAME="myproject_db"                                     # Database name
+DB_USER="postgres"                                         # Database user
+REMOTE_SERVER="davidhale87@172.16.205.4"                  # Remote backup server
+REMOTE_BACKUP_DIR="/halefiles/Coding/MyProjectDBBackups"  # Remote backup directory
+LOCAL_BACKUP_DIR="/Users/davidhale87/Coding/MyProjectDBBackups"  # Local backup directory
+
+# Container names - adjust based on your docker-compose.yml
+DB_CONTAINER="${PROJECT_NAME}-db-1"
+WEB_CONTAINER="${PROJECT_NAME}-web-1"
+NGINX_CONTAINER="${PROJECT_NAME}-nginx-1"
+# Add other containers as needed (e.g., redis, celery, etc.)
+# REDIS_CONTAINER="${PROJECT_NAME}-redis-1"
+# CELERY_CONTAINER="${PROJECT_NAME}-celery-1"
+
+# ==============================================================================
+# DEFAULT VALUES - DO NOT MODIFY
+# ==============================================================================
 BACKUP_all=false
 BACKUP_data=false
 BACKUP_local=false
@@ -10,16 +37,10 @@ RESTORE=false
 ALL=false
 MIGRATE=false
 DOWNLOAD=false
-REMOTE_SERVER="davidhale87@172.16.205.4"
-REMOTE_BACKUP_DIR="/halefiles/Coding/TripTrackDBBackups"
 
-# Project specific settings
-PROJECT_NAME="triptrack"
-DB_CONTAINER="${PROJECT_NAME}-db-1"
-WEB_CONTAINER="${PROJECT_NAME}-web-1"
-NGINX_CONTAINER="${PROJECT_NAME}-nginx-1"
-DB_NAME="triptrack"
-DB_USER="postgres"
+# ==============================================================================
+# FUNCTIONS - DO NOT MODIFY
+# ==============================================================================
 
 # Function to display help
 show_help() {
@@ -72,6 +93,14 @@ ensure_backup_dir() {
     fi
 }
 
+# Function to ensure local backup directory exists
+ensure_local_backup_dir() {
+    if [ ! -d "$LOCAL_BACKUP_DIR" ]; then
+        echo "Creating local backup directory..."
+        mkdir -p "$LOCAL_BACKUP_DIR"
+    fi
+}
+
 # Function to run Django migrations
 run_migrations() {
     echo "Running Django migrations..."
@@ -100,16 +129,17 @@ backup_database() {
     
     if [ "$is_local" = true ]; then
         # Local backup without Docker
-        pg_dump $DB_NAME -a -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}_data.sql
-        pg_dump $DB_NAME -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}.sql
-        pg_dump $DB_NAME -c -O --format=plain --file=/Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}_clean.sql
+        ensure_local_backup_dir
+        pg_dump $DB_NAME -a -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}_data.sql
+        pg_dump $DB_NAME -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}.sql
+        pg_dump $DB_NAME -c -O --format=plain --file=${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}_clean.sql
         
         echo "Local backup completed"
         
         # Copy to remote if configured
         if [ -n "$REMOTE_SERVER" ]; then
             echo "Copying to remote server..."
-            scp /Users/davidhale87/Coding/TripTrackDBBackups/${PROJECT_NAME}_backup_${backup_date}*.sql $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
+            scp ${LOCAL_BACKUP_DIR}/${PROJECT_NAME}_backup_${backup_date}*.sql $REMOTE_SERVER:$REMOTE_BACKUP_DIR/
         fi
     else
         # Docker backup
@@ -208,6 +238,23 @@ EOF'
     echo "Database restore completed"
 }
 
+# Function to get all container names for the project
+get_all_containers() {
+    # List all containers that need to be managed
+    # Add or remove containers based on your docker-compose.yml
+    echo "$DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER"
+    # If you have more containers, add them here:
+    # echo "$DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER $REDIS_CONTAINER $CELERY_CONTAINER"
+}
+
+# Function to get non-DB containers
+get_non_db_containers() {
+    # List all containers except the database
+    echo "$WEB_CONTAINER $NGINX_CONTAINER"
+    # If you have more non-DB containers, add them here:
+    # echo "$WEB_CONTAINER $NGINX_CONTAINER $REDIS_CONTAINER $CELERY_CONTAINER"
+}
+
 # Function to stop containers
 stop_containers() {
     local keep_database=$1
@@ -215,10 +262,12 @@ stop_containers() {
     echo "Stopping containers..."
     if [ "$keep_database" = true ]; then
         echo "Keeping database container running"
-        sudo docker stop $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        local containers=$(get_non_db_containers)
+        sudo docker stop $containers 2>/dev/null || true
     else
         echo "Stopping all containers including database"
-        sudo docker stop $DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        local containers=$(get_all_containers)
+        sudo docker stop $containers 2>/dev/null || true
     fi
 }
 
@@ -229,10 +278,12 @@ remove_containers() {
     echo "Removing containers..."
     if [ "$keep_database" = true ]; then
         echo "Keeping database container"
-        sudo docker rm $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        local containers=$(get_non_db_containers)
+        sudo docker rm $containers 2>/dev/null || true
     else
         echo "Removing all containers including database"
-        sudo docker rm $DB_CONTAINER $WEB_CONTAINER $NGINX_CONTAINER 2>/dev/null || true
+        local containers=$(get_all_containers)
+        sudo docker rm $containers 2>/dev/null || true
     fi
 }
 
@@ -245,14 +296,20 @@ remove_volumes() {
     echo "Removing static and media volumes"
     sudo docker volume rm ${PROJECT_NAME}_static_volume 2>/dev/null || true
     sudo docker volume rm ${PROJECT_NAME}_media_volume 2>/dev/null || true
+    # Add other non-DB volumes here if needed
     
     if [ "$keep_database" = true ]; then
         echo "Keeping database volume"
     else
         echo "Removing database volume"
         sudo docker volume rm ${PROJECT_NAME}_postgres_data 2>/dev/null || true
+        # Add other DB-related volumes here if needed
     fi
 }
+
+# ==============================================================================
+# MAIN SCRIPT
+# ==============================================================================
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -314,16 +371,19 @@ if [ -z "$USER_DATE" ]; then
 fi
 
 # Display selected operations
-echo "Running build with the following options:"
+echo "=============================================="
+echo "Project: $PROJECT_NAME"
 echo "Date: $USER_DATE"
-echo "Backup: $BACKUP_all"
-echo "Local Backup: $BACKUP_local"
-echo "Rebuild: $REBUILD"
-echo "Soft Rebuild: $SOFT_REBUILD"
-echo "Restore: $RESTORE"
-echo "Migrate: $MIGRATE"
-echo "Download: $DOWNLOAD"
-echo "-----------------------------------"
+echo "=============================================="
+echo "Operations:"
+echo "  Backup: $BACKUP_all"
+echo "  Local Backup: $BACKUP_local"
+echo "  Rebuild: $REBUILD"
+echo "  Soft Rebuild: $SOFT_REBUILD"
+echo "  Restore: $RESTORE"
+echo "  Migrate: $MIGRATE"
+echo "  Download: $DOWNLOAD"
+echo "=============================================="
 
 # Execute operations
 
@@ -424,4 +484,6 @@ if [ "$MIGRATE" = true ] && [ "$REBUILD" = false ] && [ "$SOFT_REBUILD" = false 
     run_migrations
 fi
 
+echo "=============================================="
 echo "Build script completed successfully!"
+echo "=============================================="

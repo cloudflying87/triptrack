@@ -1,0 +1,111 @@
+<!-- tracker/templates/tracker/location_detail.html -->
+{% extends 'tracker/base.html' %}
+{% load static %}
+
+{% block title %}TripTracker - {{ location.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>{{ location.name }}</h1>
+            <div>
+                <a href="{% url 'location_update' location.pk %}" class="btn btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <a href="{% url 'location_delete' location.pk %}" class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Delete
+                </a>
+            </div>
+        </div>
+        
+        {% if location.address %}
+        <p class="lead">{{ location.address }}</p>
+        {% endif %}
+        
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="mb-2"><strong>Family:</strong> {{ location.family.name }}</p>
+                <p class="mb-2"><strong>Created by:</strong> {{ location.created_by.username }}</p>
+                <p class="mb-0"><strong>Created at:</strong> {{ location.created_at|date:"M d, Y" }}</p>
+            </div>
+        </div>
+        
+        {% if location.latitude and location.longitude %}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Coordinates</h5>
+                <p class="mb-1"><strong>Latitude:</strong> {{ location.latitude }}</p>
+                <p class="mb-0"><strong>Longitude:</strong> {{ location.longitude }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="bg-light text-center py-4 rounded">
+            <i class="bi bi-geo-alt-fill" style="font-size: 5rem; color: #0d6efd;"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Events at this Location</h5>
+            </div>
+            <div class="card-body">
+                {% if events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Vehicle</th>
+                                    <th>Type</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in events %}
+                                    <tr>
+                                        <td>{{ event.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            <a href="{% url 'vehicle_detail' event.vehicle.pk %}">
+                                                {{ event.vehicle.name }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if event.event_type == 'maintenance' %}bg-success{% elif event.event_type == 'gas' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                                                {{ event.get_event_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if event.notes %}
+                                                {{ event.notes|truncatechars:50 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info mb-0">
+                        No events recorded at this location yet.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{% url 'location_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Locations
+    </a>
+</div>
+{% endblock %}

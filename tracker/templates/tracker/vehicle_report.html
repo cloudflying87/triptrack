@@ -247,7 +247,6 @@
                                 <tr>
                                     <th>Date</th>
                                     <th>Location</th>
-                                    <th>{{ vehicle.get_unit|title }}</th>
                                     <th>Notes</th>
                                 </tr>
                             </thead>
@@ -258,15 +257,6 @@
                                         <td>
                                             {% if event.location %}
                                                 {{ event.location }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if vehicle.type == 'car' and event.miles %}
-                                                {{ event.miles }}
-                                            {% elif vehicle.type != 'car' and event.hours %}
-                                                {{ event.hours }}
                                             {% else %}
                                                 -
                                             {% endif %}
