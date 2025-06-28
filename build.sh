@@ -19,8 +19,8 @@ DB_CONTAINER="${PROJECT_NAME}-triptracker_db-1"
 WEB_CONTAINER="${PROJECT_NAME}-triptracker-1"
 REDIS_CONTAINER="${PROJECT_NAME}-triptracker_redis-1"
 TUNNEL_CONTAINER="${PROJECT_NAME}-triptracker_tunnel-1"
-DB_NAME="triptrack"
-DB_USER="postgres"
+DB_NAME="triptracker_db"
+DB_USER="triptracker_db_user"
 
 # Function to display help
 show_help() {
