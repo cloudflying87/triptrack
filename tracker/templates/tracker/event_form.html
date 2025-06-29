@@ -100,6 +100,40 @@ document.addEventListener('DOMContentLoaded', function() {
     calculateTotal();
   }
   {% endif %}
+  
+  // Filter maintenance categories by vehicle type for maintenance forms
+  {% if event_type == 'maintenance' %}
+  const vehicleSelect = document.getElementById('id_vehicle');
+  const categorySelect = document.getElementById('id_maintenance_category');
+  
+  if (vehicleSelect && categorySelect) {
+    vehicleSelect.addEventListener('change', function() {
+      const vehicleId = this.value;
+      
+      if (vehicleId) {
+        // Fetch filtered categories for this vehicle type
+        fetch(`/api/maintenance-categories/?vehicle=${vehicleId}`)
+          .then(response => response.json())
+          .then(data => {
+            // Clear existing options except the empty one
+            categorySelect.innerHTML = '<option value="">---------</option>';
+            
+            // Add filtered categories
+            data.categories.forEach(category => {
+              const option = new Option(category.name, category.id);
+              categorySelect.add(option);
+            });
+          })
+          .catch(error => {
+            console.error('Error fetching categories:', error);
+          });
+      } else {
+        // If no vehicle selected, show all categories
+        categorySelect.innerHTML = '<option value="">---------</option>';
+      }
+    });
+  }
+  {% endif %}
 });
 </script>
 {% endblock %}

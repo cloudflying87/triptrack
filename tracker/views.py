@@ -1356,3 +1356,34 @@ class VehicleDetailAPIView(LoginRequiredMixin, APIView):
                 {'error': 'Vehicle not found or access denied'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+@login_required
+@require_GET
+def maintenance_categories_api(request):
+    """API endpoint to get maintenance categories filtered by vehicle type"""
+    vehicle_id = request.GET.get('vehicle')
+    
+    if not vehicle_id:
+        return JsonResponse({'categories': []})
+    
+    try:
+        # Get the vehicle and check user access
+        user_families = request.user.families.all()
+        vehicle = Vehicle.objects.get(pk=vehicle_id, family__in=user_families)
+        
+        # Get categories that apply to this vehicle type
+        from .models import MaintenanceCategory
+        categories = MaintenanceCategory.objects.filter(
+            vehicle_types__contains=[vehicle.type]
+        ).values('id', 'name', 'description')
+        
+        return JsonResponse({
+            'categories': list(categories),
+            'vehicle_type': vehicle.type
+        })
+        
+    except Vehicle.DoesNotExist:
+        return JsonResponse({'error': 'Vehicle not found or access denied'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

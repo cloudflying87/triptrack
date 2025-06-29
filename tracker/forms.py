@@ -224,7 +224,7 @@ class MaintenanceEventForm(VehicleTypeFieldMixin, forms.ModelForm):
         model = Event
         fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'total_cost', 'notes']
         widgets = {
-            'vehicle': forms.Select(attrs={'class': 'form-select'}),
+            'vehicle': forms.Select(attrs={'class': 'form-select', 'data-filter-categories': 'true'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'maintenance_category': forms.Select(attrs={'class': 'form-select'}),
             'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
@@ -244,6 +244,19 @@ class MaintenanceEventForm(VehicleTypeFieldMixin, forms.ModelForm):
         if user:
             user_families = user.families.all()
             self.fields['vehicle'].queryset = Vehicle.objects.filter(family__in=user_families)
+        
+        # Filter maintenance categories based on vehicle type if editing existing event
+        if self.instance and self.instance.pk and self.instance.vehicle:
+            vehicle_type = self.instance.vehicle.type
+            from .models import MaintenanceCategory
+            self.fields['maintenance_category'].queryset = MaintenanceCategory.objects.filter(
+                vehicle_types__contains=[vehicle_type]
+            )
+        else:
+            # For new records, show all categories initially
+            # JavaScript will filter them when vehicle is selected
+            from .models import MaintenanceCategory
+            self.fields['maintenance_category'].queryset = MaintenanceCategory.objects.all()
 
 
 class MaintenanceScheduleForm(forms.ModelForm):

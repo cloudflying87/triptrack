@@ -81,11 +81,23 @@ class Location(models.Model):
         return self.name
 
 class MaintenanceCategory(models.Model):
+    VEHICLE_TYPE_CHOICES = [
+        ('car', 'Car'),
+        ('boat', 'Boat'),
+        ('other', 'Other'),
+        ('all', 'All Vehicle Types'),
+    ]
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    vehicle_types = models.JSONField(default=list, help_text="List of vehicle types this category applies to")
     
     def __str__(self):
         return self.name
+    
+    def applies_to_vehicle_type(self, vehicle_type):
+        """Check if this category applies to the given vehicle type"""
+        return 'all' in self.vehicle_types or vehicle_type in self.vehicle_types
     
     class Meta:
         verbose_name_plural = "Maintenance Categories"

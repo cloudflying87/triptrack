@@ -71,6 +71,7 @@ urlpatterns = [
     path('api/vehicle/<int:vehicle_id>/events/', views.vehicle_events_api, name='vehicle_events_api'),
     path('api/vehicle/<int:vehicle_id>/mileage/', views.vehicle_mileage_api, name='vehicle_mileage_api'),
     path('api/vehicle/<int:vehicle_id>/fuel-efficiency/', views.vehicle_fuel_efficiency_api, name='vehicle_fuel_efficiency_api'),
+    path('api/maintenance-categories/', views.maintenance_categories_api, name='maintenance_categories_api'),
     
     # Health check and debug info
     path('health/', views.health_check, name='health_check'),
