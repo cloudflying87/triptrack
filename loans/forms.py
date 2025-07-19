@@ -167,6 +167,15 @@ class LoanCalculatorForm(forms.Form):
         label="Term (Months)",
         widget=forms.NumberInput(attrs={'min': '1', 'max': '480'})
     )
+    desired_monthly_payment = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        label="Desired Monthly Payment (Optional)",
+        widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
+        help_text="Enter a higher payment to see potential savings"
+    )
     generate_schedule = forms.BooleanField(
         required=False,
         label="Generate Amortization Schedule",
@@ -215,6 +224,13 @@ class ExtraPaymentCalculatorForm(forms.Form):
 
 
 class RefinanceCalculatorForm(forms.Form):
+    existing_loan = forms.ModelChoiceField(
+        queryset=None,  # Will be set in __init__
+        required=False,
+        empty_label="Or enter loan details manually below",
+        label="Select Existing Loan (Optional)",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     current_balance = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -265,6 +281,22 @@ class RefinanceCalculatorForm(forms.Form):
         label="Cash Out Amount (Optional)",
         widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0'})
     )
+
+    def __init__(self, *args, **kwargs):
+        user_family = kwargs.pop('user_family', None)
+        super().__init__(*args, **kwargs)
+        
+        if user_family:
+            from .models import Loan
+            self.fields['existing_loan'].queryset = Loan.objects.filter(
+                family=user_family, 
+                status='active'
+            ).select_related('loan_type')
+        
+        # Make current loan fields optional when selecting existing loan
+        self.fields['current_balance'].required = False
+        self.fields['current_interest_rate'].required = False
+        self.fields['current_remaining_months'].required = False
 
 
 class InvestmentCalculatorForm(forms.Form):

@@ -1,0 +1,140 @@
+{% extends 'loans/base.html' %}
+{% load static %}
+{% load loan_extras %}
+
+{% block page_title %}Create Refinance Record{% endblock %}
+
+{% block loans_content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="bi bi-arrow-repeat"></i> Create Refinance Record</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Refinance Summary</h6>
+                    <p class="mb-0">You're about to create a refinance record for <strong>{{ original_loan.name }}</strong>. This will:</p>
+                    <ul class="mt-2 mb-0">
+                        <li>Mark the original loan as "Refinanced"</li>
+                        <li>Create a new loan with the new terms</li>
+                        <li>Track the refinancing history for future reference</li>
+                    </ul>
+                </div>
+                
+                <!-- Original Loan Details -->
+                <h5 class="mt-4 mb-3">Original Loan</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ original_loan.name }}</h6>
+                                <p class="card-text">
+                                    <strong>Current Balance:</strong> ${{ original_loan.current_balance|floatformat:2 }}<br>
+                                    <strong>Interest Rate:</strong> {{ original_loan.interest_rate }}%<br>
+                                    <strong>Remaining Payments:</strong> {{ original_loan.get_remaining_payments }} months<br>
+                                    <strong>Monthly Payment:</strong> ${{ original_loan.monthly_payment|floatformat:2 }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-success bg-opacity-10">
+                            <div class="card-body">
+                                <h6 class="card-title">New Loan Terms</h6>
+                                <p class="card-text">
+                                    <strong>New Balance:</strong> ${{ result.new_principal|floatformat:2 }}<br>
+                                    <strong>Interest Rate:</strong> {{ new_rate }}%<br>
+                                    <strong>Term:</strong> {{ new_term }} months<br>
+                                    <strong>Monthly Payment:</strong> ${{ result.new_payment|floatformat:2 }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Refinance Costs -->
+                <h5 class="mt-4 mb-3">Refinance Costs</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <tbody>
+                            <tr>
+                                <td>Closing Costs</td>
+                                <td class="text-end">${{ closing_costs|floatformat:2 }}</td>
+                            </tr>
+                            {% if cash_out > 0 %}
+                            <tr>
+                                <td>Cash Out Amount</td>
+                                <td class="text-end">${{ cash_out|floatformat:2 }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr class="table-active">
+                                <td><strong>Total Added to Loan</strong></td>
+                                <td class="text-end"><strong>${{ closing_costs|add:cash_out|floatformat:2 }}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Savings Summary -->
+                <h5 class="mt-4 mb-3">Expected Savings</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <small class="text-muted">Monthly Savings</small>
+                            <div class="fs-5 fw-bold {% if result.monthly_savings > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if result.monthly_savings > 0 %}+{% endif %}${{ result.monthly_savings|floatformat:2 }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <small class="text-muted">Total Interest Savings</small>
+                            <div class="fs-5 fw-bold {% if result.new_total_interest < result.current_total_interest %}text-success{% else %}text-danger{% endif %}">
+                                ${{ result.current_total_interest|sub:result.new_total_interest|floatformat:2 }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <small class="text-muted">Break-even</small>
+                            <div class="fs-5 fw-bold">
+                                {% if result.breakeven_months %}
+                                    {{ result.breakeven_months }} months
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Confirmation Form -->
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="new_rate" value="{{ new_rate }}">
+                    <input type="hidden" name="new_term" value="{{ new_term }}">
+                    <input type="hidden" name="closing_costs" value="{{ closing_costs }}">
+                    <input type="hidden" name="cash_out" value="{{ cash_out }}">
+                    
+                    <div class="mb-3">
+                        <label for="new_lender" class="form-label">New Lender (Optional)</label>
+                        <input type="text" class="form-control" id="new_lender" name="new_lender" 
+                               value="{{ original_loan.lender }}" placeholder="Enter new lender name">
+                        <div class="form-text">Leave blank to use the same lender as the original loan</div>
+                    </div>
+                    
+                    <div class="d-flex gap-3 justify-content-end">
+                        <a href="{% url 'loans:refinance_calculator' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Calculator
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Create Refinance Record
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

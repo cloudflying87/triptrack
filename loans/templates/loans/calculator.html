@@ -1,5 +1,6 @@
 {% extends 'loans/base.html' %}
 {% load static %}
+{% load loan_extras %}
 
 {% block page_title %}Loan Calculator{% endblock %}
 
@@ -31,9 +32,18 @@
                 <div class="mb-3">
                     <label for="{{ form.term_months.id_for_label }}" class="form-label">{{ form.term_months.label }}</label>
                     {{ form.term_months }}
-                    <small class="form-text text-muted">Or {{ form.term_months.value|default:360|div:12 }} years</small>
+                    <small class="form-text text-muted">Or {{ form.term_months.value|default:360|div:12|floatformat:1 }} years</small>
                     {% if form.term_months.errors %}
                         <div class="text-danger">{{ form.term_months.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.desired_monthly_payment.id_for_label }}" class="form-label">{{ form.desired_monthly_payment.label }}</label>
+                    {{ form.desired_monthly_payment }}
+                    <small class="form-text text-muted">{{ form.desired_monthly_payment.help_text }}</small>
+                    {% if form.desired_monthly_payment.errors %}
+                        <div class="text-danger">{{ form.desired_monthly_payment.errors.0 }}</div>
                     {% endif %}
                 </div>
                 
@@ -85,6 +95,59 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Savings Analysis (if desired payment provided) -->
+                {% if result.desired_payment %}
+                <div class="mt-4 p-3 bg-success bg-opacity-10 border border-success rounded">
+                    <h6 class="text-success"><i class="bi bi-piggy-bank"></i> Savings with Higher Payment</h6>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">Your Desired Payment</small>
+                                <div class="fw-bold text-success">${{ result.desired_payment|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">Extra Per Month</small>
+                                <div class="fw-bold">${{ result.desired_payment|sub:result.monthly_payment|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">New Total Interest</small>
+                                <div class="fw-bold text-success">${{ result.savings.extra_total_interest|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">New Total Payments</small>
+                                <div class="fw-bold">${{ result.savings.extra_total_payments|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">Interest Saved</small>
+                                <div class="fw-bold text-success">${{ result.savings.interest_saved|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="mb-2">
+                                <small class="text-muted">Time Saved</small>
+                                <div class="fw-bold">{{ result.savings.time_saved_months }} months</div>
+                            </div>
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        New payoff time: {{ result.savings.extra_months }} months 
+                        ({{ result.savings.extra_months|div:12|floatformat:1 }} years)
+                    </small>
+                </div>
+                {% endif %}
                 
                 <!-- Loan Summary Chart -->
                 <div class="mt-4">
@@ -222,6 +285,36 @@
         if (helpText && months) {
             helpText.textContent = `Or ${years} years`;
         }
+    });
+
+    // Add helpful placeholder text to desired payment field
+    document.addEventListener('DOMContentLoaded', function() {
+        const desiredPaymentField = document.getElementById('{{ form.desired_monthly_payment.id_for_label }}');
+        const principalField = document.getElementById('{{ form.principal_amount.id_for_label }}');
+        const rateField = document.getElementById('{{ form.annual_interest_rate.id_for_label }}');
+        const termField = document.getElementById('{{ form.term_months.id_for_label }}');
+        
+        function updateDesiredPaymentPlaceholder() {
+            const principal = parseFloat(principalField.value) || 0;
+            const rate = parseFloat(rateField.value) || 0;
+            const term = parseInt(termField.value) || 0;
+            
+            if (principal > 0 && term > 0) {
+                let monthlyPayment;
+                if (rate === 0) {
+                    monthlyPayment = principal / term;
+                } else {
+                    const monthlyRate = rate / 100 / 12;
+                    monthlyPayment = (principal * monthlyRate * Math.pow(1 + monthlyRate, term)) / 
+                                   (Math.pow(1 + monthlyRate, term) - 1);
+                }
+                desiredPaymentField.placeholder = `Standard: $${monthlyPayment.toFixed(2)}`;
+            }
+        }
+        
+        principalField.addEventListener('input', updateDesiredPaymentPlaceholder);
+        rateField.addEventListener('input', updateDesiredPaymentPlaceholder);
+        termField.addEventListener('input', updateDesiredPaymentPlaceholder);
     });
 </script>
 {% endblock %}

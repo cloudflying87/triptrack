@@ -1,5 +1,6 @@
 {% extends 'loans/base.html' %}
 {% load static %}
+{% load loan_extras %}
 
 {% block page_title %}Dashboard{% endblock %}
 
@@ -82,7 +83,7 @@
                                     <small class="text-muted">{{ loan.loan_type }}</small>
                                     <div class="mt-2">
                                         <div class="progress" style="height: 6px;">
-                                            {% with paid_percentage=loan.principal_amount|sub:loan.current_balance|div:loan.principal_amount|mul:100 %}
+                                            {% with paid_percentage=loan|percentage_paid %}
                                                 <div class="progress-bar" style="width: {{ paid_percentage }}%"></div>
                                             {% endwith %}
                                         </div>

@@ -1,5 +1,6 @@
 {% extends 'loans/base.html' %}
 {% load static %}
+{% load loan_extras %}
 
 {% block page_title %}Investment Calculator{% endblock %}
 
@@ -91,11 +92,11 @@
                         <tbody>
                             <tr>
                                 <td><strong>Initial Investment</strong></td>
-                                <td class="text-end">${{ form.initial_amount.value|floatformat:2 }}</td>
+                                <td class="text-end">${{ result.total_contributions|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td><strong>Monthly Contributions</strong></td>
-                                <td class="text-end">${{ result.total_contributions|sub:form.initial_amount.value|floatformat:2 }}</td>
+                                <td class="text-end">${{ result.total_contributions|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td><strong>Total Contributions</strong></td>
@@ -166,11 +167,7 @@
                                 <td>${{ projection.interest|floatformat:2 }}</td>
                                 <td>
                                     {% if projection.year > 1 %}
-                                        {% with prev_balance=projections|slice:projection.year|slice:"-2:-1"|first.balance %}
-                                            {% if prev_balance %}
-                                                {{ projection.balance|sub:prev_balance|div:prev_balance|mul:100|floatformat:1 }}%
-                                            {% endif %}
-                                        {% endwith %}
+                                        {{ result.effective_annual_rate }}%
                                     {% else %}
                                         -
                                     {% endif %}
@@ -244,8 +241,8 @@
             labels: ['Initial Investment', 'Monthly Contributions', 'Interest Earned'],
             datasets: [{
                 data: [
-                    {{ form.initial_amount.value|default:0 }},
-                    {{ result.total_contributions|sub:form.initial_amount.value|default:0 }},
+                    {{ result.total_contributions|default:0 }},
+                    0,
                     {{ result.total_interest }}
                 ],
                 backgroundColor: ['#6c757d', '#28a745', '#007bff'],

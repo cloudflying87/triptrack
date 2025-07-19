@@ -22,6 +22,7 @@ urlpatterns = [
     path('loans/<int:loan_id>/', views.loan_detail, name='loan_detail'),
     path('loans/add/', views.add_loan, name='add_loan'),
     path('loans/<int:loan_id>/payment/', views.add_payment, name='add_payment'),
+    path('loans/<int:loan_id>/refinance/', views.create_refinance, name='create_refinance'),
     path('loans/<int:loan_id>/export-csv/', views.export_amortization_csv, name='export_amortization_csv'),
     
     # Investments

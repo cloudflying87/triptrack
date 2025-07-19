@@ -53,6 +53,24 @@ class Loan(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_loans')
     loan_type = models.ForeignKey(LoanType, on_delete=models.PROTECT, related_name='loans')
     
+    # Sharing and permissions
+    is_shared = models.BooleanField(
+        default=True, 
+        help_text="Whether this loan is shared with all family members or private to creator"
+    )
+    shared_with = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='shared_loans',
+        help_text="Specific users this loan is shared with (in addition to family members)"
+    )
+    read_only_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='readonly_loans',
+        help_text="Users who can view but not edit this loan"
+    )
+    
     # Basic loan details
     name = models.CharField(max_length=200, help_text="Descriptive name for the loan")
     lender = models.CharField(max_length=200, blank=True, null=True)
@@ -112,6 +130,45 @@ class Loan(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.loan_type} (${self.current_balance:,.2f})"
+    
+    def can_view(self, user):
+        """Check if user can view this loan"""
+        # Creator can always view
+        if user == self.created_by:
+            return True
+        
+        # Family members can view if shared
+        if self.is_shared and user.families.filter(id=self.family_id).exists():
+            return True
+        
+        # Specifically shared users can view
+        if self.shared_with.filter(id=user.id).exists():
+            return True
+        
+        # Read-only users can view
+        if self.read_only_users.filter(id=user.id).exists():
+            return True
+        
+        return False
+    
+    def can_edit(self, user):
+        """Check if user can edit this loan"""
+        # Creator can always edit
+        if user == self.created_by:
+            return True
+        
+        # Family members can edit if shared (but not read-only)
+        if (self.is_shared and 
+            user.families.filter(id=self.family_id).exists() and 
+            not self.read_only_users.filter(id=user.id).exists()):
+            return True
+        
+        # Specifically shared users can edit (but not read-only)
+        if (self.shared_with.filter(id=user.id).exists() and 
+            not self.read_only_users.filter(id=user.id).exists()):
+            return True
+        
+        return False
     
     def calculate_monthly_payment(self):
         """Calculate the standard monthly payment using loan formula"""
@@ -381,6 +438,24 @@ class Investment(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_investments')
     investment_type = models.ForeignKey(InvestmentType, on_delete=models.PROTECT, related_name='investments')
     
+    # Sharing and permissions
+    is_shared = models.BooleanField(
+        default=True, 
+        help_text="Whether this investment is shared with all family members or private to creator"
+    )
+    shared_with = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='shared_investments',
+        help_text="Specific users this investment is shared with (in addition to family members)"
+    )
+    read_only_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='readonly_investments',
+        help_text="Users who can view but not edit this investment"
+    )
+    
     # Basic investment details
     name = models.CharField(max_length=200, help_text="Descriptive name for the investment")
     institution = models.CharField(max_length=200, blank=True, null=True)
@@ -447,6 +522,45 @@ class Investment(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.investment_type} (${self.current_value:,.2f})"
+    
+    def can_view(self, user):
+        """Check if user can view this investment"""
+        # Creator can always view
+        if user == self.created_by:
+            return True
+        
+        # Family members can view if shared
+        if self.is_shared and user.families.filter(id=self.family_id).exists():
+            return True
+        
+        # Specifically shared users can view
+        if self.shared_with.filter(id=user.id).exists():
+            return True
+        
+        # Read-only users can view
+        if self.read_only_users.filter(id=user.id).exists():
+            return True
+        
+        return False
+    
+    def can_edit(self, user):
+        """Check if user can edit this investment"""
+        # Creator can always edit
+        if user == self.created_by:
+            return True
+        
+        # Family members can edit if shared (but not read-only)
+        if (self.is_shared and 
+            user.families.filter(id=self.family_id).exists() and 
+            not self.read_only_users.filter(id=user.id).exists()):
+            return True
+        
+        # Specifically shared users can edit (but not read-only)
+        if (self.shared_with.filter(id=user.id).exists() and 
+            not self.read_only_users.filter(id=user.id).exists()):
+            return True
+        
+        return False
     
     def calculate_future_value(self, years):
         """Calculate future value with compound interest and regular contributions"""

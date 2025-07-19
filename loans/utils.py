@@ -390,6 +390,69 @@ def calculate_debt_snowball(loans, extra_payment):
     }
 
 
+def calculate_lifetime_savings(existing_loan, refinance_result):
+    """
+    Calculate lifetime savings from refinancing considering loan history
+    
+    Args:
+        existing_loan: Loan object that is being refinanced
+        refinance_result: Result from calculate_refinance_comparison
+    
+    Returns:
+        Dictionary with lifetime savings analysis
+    """
+    from django.db.models import Sum
+    
+    # Get total payments already made on original loan
+    total_payments_made = existing_loan.payments.aggregate(
+        total=Sum('amount')
+    )['total'] or Decimal('0.00')
+    
+    # Calculate what original loan would have cost over its full term
+    original_schedule = generate_amortization_schedule(
+        existing_loan.principal_amount,
+        existing_loan.interest_rate,
+        existing_loan.term_months,
+        existing_loan.monthly_payment
+    )
+    
+    original_total_cost = sum(payment['payment'] for payment in original_schedule)
+    original_total_interest = original_total_cost - existing_loan.principal_amount
+    
+    # Calculate remaining cost of current loan
+    current_remaining_cost = refinance_result['current_total_payments']
+    
+    # Calculate new loan total cost
+    new_total_cost = refinance_result['new_total_payments']
+    
+    # Lifetime analysis
+    total_original_cost = total_payments_made + current_remaining_cost
+    total_new_cost = total_payments_made + new_total_cost
+    
+    lifetime_savings = total_original_cost - total_new_cost
+    
+    # Interest savings from original loan schedule
+    payments_made_count = existing_loan.payments.count()
+    if payments_made_count < len(original_schedule):
+        remaining_interest_original = sum(
+            payment['interest'] for payment in original_schedule[payments_made_count:]
+        )
+    else:
+        remaining_interest_original = 0
+    
+    interest_savings = remaining_interest_original - refinance_result['new_total_interest']
+    
+    return {
+        'original_total_cost': round(original_total_cost, 2),
+        'original_total_interest': round(original_total_interest, 2),
+        'total_payments_made': total_payments_made,
+        'lifetime_savings': round(lifetime_savings, 2),
+        'lifetime_interest_savings': round(interest_savings, 2),
+        'payments_made_count': payments_made_count,
+        'original_term_months': existing_loan.term_months
+    }
+
+
 def calculate_net_worth_projection(loans, investments, years=10):
     """
     Project net worth over time considering loan payoffs and investment growth
