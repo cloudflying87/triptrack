@@ -1,0 +1,344 @@
+{% extends 'loans/base.html' %}
+{% load static %}
+
+{% block page_title %}Refinance Calculator{% endblock %}
+
+{% block loans_content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="calculator-form">
+            <h3><i class="bi bi-arrow-repeat"></i> Refinance Calculator</h3>
+            <p class="text-muted">Compare your current loan with refinancing options to see potential savings.</p>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <!-- Current Loan Section -->
+                <h5 class="mt-4 mb-3 text-primary">Current Loan Details</h5>
+                
+                <div class="mb-3">
+                    <label for="{{ form.current_balance.id_for_label }}" class="form-label">{{ form.current_balance.label }}</label>
+                    {{ form.current_balance }}
+                    {% if form.current_balance.errors %}
+                        <div class="text-danger">{{ form.current_balance.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.current_interest_rate.id_for_label }}" class="form-label">{{ form.current_interest_rate.label }}</label>
+                    {{ form.current_interest_rate }}
+                    {% if form.current_interest_rate.errors %}
+                        <div class="text-danger">{{ form.current_interest_rate.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.current_remaining_months.id_for_label }}" class="form-label">{{ form.current_remaining_months.label }}</label>
+                    {{ form.current_remaining_months }}
+                    {% if form.current_remaining_months.errors %}
+                        <div class="text-danger">{{ form.current_remaining_months.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- New Loan Section -->
+                <h5 class="mt-4 mb-3 text-success">New Loan Details</h5>
+                
+                <div class="mb-3">
+                    <label for="{{ form.new_interest_rate.id_for_label }}" class="form-label">{{ form.new_interest_rate.label }}</label>
+                    {{ form.new_interest_rate }}
+                    {% if form.new_interest_rate.errors %}
+                        <div class="text-danger">{{ form.new_interest_rate.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.new_term_months.id_for_label }}" class="form-label">{{ form.new_term_months.label }}</label>
+                    {{ form.new_term_months }}
+                    {% if form.new_term_months.errors %}
+                        <div class="text-danger">{{ form.new_term_months.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.closing_costs.id_for_label }}" class="form-label">{{ form.closing_costs.label }}</label>
+                    {{ form.closing_costs }}
+                    {% if form.closing_costs.errors %}
+                        <div class="text-danger">{{ form.closing_costs.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.cash_out_amount.id_for_label }}" class="form-label">{{ form.cash_out_amount.label }}</label>
+                    {{ form.cash_out_amount }}
+                    {% if form.cash_out_amount.errors %}
+                        <div class="text-danger">{{ form.cash_out_amount.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-calculator"></i> Compare Options
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        {% if result %}
+            <div class="result-panel">
+                <h4><i class="bi bi-graph-up-arrow text-primary"></i> Refinance Analysis</h4>
+                
+                <!-- Savings Summary -->
+                <div class="row mb-4">
+                    <div class="col-sm-6">
+                        <div class="card text-center {% if result.monthly_savings > 0 %}bg-success text-white{% else %}bg-warning{% endif %}">
+                            <div class="card-body">
+                                <h6>Monthly Savings</h6>
+                                <h4>${{ result.monthly_savings|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="card text-center {% if result.total_savings > 0 %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+                            <div class="card-body">
+                                <h6>Total Savings</h6>
+                                <h4>${{ result.total_savings|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Break-even Analysis -->
+                {% if result.breakeven_months %}
+                <div class="alert {% if result.breakeven_months <= 24 %}alert-success{% elif result.breakeven_months <= 60 %}alert-warning{% else %}alert-danger{% endif %}">
+                    <h6><i class="bi bi-clock"></i> Break-even Point</h6>
+                    <p class="mb-0">
+                        You'll recover closing costs in <strong>{{ result.breakeven_months }} months</strong>
+                        ({{ result.breakeven_months|div:12|floatformat:1 }} years)
+                    </p>
+                </div>
+                {% endif %}
+                
+                <!-- Detailed Comparison -->
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th></th>
+                                <th>Current Loan</th>
+                                <th>New Loan</th>
+                                <th>Difference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Monthly Payment</strong></td>
+                                <td>${{ result.current_payment|floatformat:2 }}</td>
+                                <td>${{ result.new_payment|floatformat:2 }}</td>
+                                <td class="{% if result.monthly_savings > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if result.monthly_savings > 0 %}+{% endif %}${{ result.monthly_savings|floatformat:2 }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Interest</strong></td>
+                                <td>${{ result.current_total_interest|floatformat:2 }}</td>
+                                <td>${{ result.new_total_interest|floatformat:2 }}</td>
+                                <td class="{% if result.new_total_interest < result.current_total_interest %}text-success{% else %}text-danger{% endif %}">
+                                    ${{ result.new_total_interest|sub:result.current_total_interest|floatformat:2 }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Payments</strong></td>
+                                <td>${{ result.current_total_payments|floatformat:2 }}</td>
+                                <td>${{ result.new_total_payments|floatformat:2 }}</td>
+                                <td class="{% if result.total_savings > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if result.total_savings > 0 %}+{% endif %}${{ result.total_savings|floatformat:2 }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Loan Principal</strong></td>
+                                <td>${{ result.current_balance|floatformat:2 }}</td>
+                                <td>${{ result.new_principal|floatformat:2 }}</td>
+                                <td>${{ result.new_principal|sub:result.current_balance|floatformat:2 }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Cost Breakdown -->
+                <div class="mt-4">
+                    <h6>Refinancing Costs</h6>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Closing Costs</span>
+                            <strong>${{ result.closing_costs|floatformat:2 }}</strong>
+                        </li>
+                        {% if result.cash_out > 0 %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Cash Out</span>
+                            <strong>${{ result.cash_out|floatformat:2 }}</strong>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                <!-- Refinance Chart -->
+                <div class="mt-4">
+                    <canvas id="refinanceChart" width="400" height="200"></canvas>
+                </div>
+                
+                <!-- Recommendation -->
+                <div class="mt-4">
+                    {% if result.total_savings > 0 and result.breakeven_months and result.breakeven_months <= 36 %}
+                        <div class="alert alert-success">
+                            <h6><i class="bi bi-check-circle"></i> Recommendation: Refinance</h6>
+                            <p class="mb-0">This refinance looks beneficial with good savings and reasonable break-even time.</p>
+                        </div>
+                    {% elif result.monthly_savings > 0 %}
+                        <div class="alert alert-warning">
+                            <h6><i class="bi bi-exclamation-triangle"></i> Recommendation: Consider Carefully</h6>
+                            <p class="mb-0">You'll save monthly but consider the break-even period and total costs.</p>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-danger">
+                            <h6><i class="bi bi-x-circle"></i> Recommendation: Keep Current Loan</h6>
+                            <p class="mb-0">This refinance doesn't appear to offer significant benefits.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="text-center text-muted">
+                <i class="bi bi-arrow-repeat" style="font-size: 4rem;"></i>
+                <p class="mt-3">Enter loan details to compare refinancing options</p>
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> Generally, refinancing is beneficial if you can lower your rate by 0.5-1% or more.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Refinancing Tips -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Refinancing Considerations</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-check-circle text-success"></i> Good Times to Refinance</h6>
+                        <ul>
+                            <li>Interest rates have dropped significantly</li>
+                            <li>Your credit score has improved</li>
+                            <li>You want to switch from adjustable to fixed rate</li>
+                            <li>You need to access home equity (cash-out)</li>
+                            <li>You want to remove PMI</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-x-circle text-danger"></i> When to Avoid Refinancing</h6>
+                        <ul>
+                            <li>You're planning to move soon</li>
+                            <li>Closing costs outweigh savings</li>
+                            <li>You're near the end of your loan term</li>
+                            <li>Your credit score has decreased</li>
+                            <li>You'll reset to a longer loan term</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    {% if result %}
+    // Create refinance comparison chart
+    const ctx = document.getElementById('refinanceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Current Loan', 'New Loan'],
+            datasets: [
+                {
+                    label: 'Principal',
+                    data: [{{ result.current_balance }}, {{ result.new_principal }}],
+                    backgroundColor: '#6c757d'
+                },
+                {
+                    label: 'Interest',
+                    data: [{{ result.current_total_interest }}, {{ result.new_total_interest }}],
+                    backgroundColor: '#dc3545'
+                },
+                {
+                    label: 'Closing Costs',
+                    data: [0, {{ result.closing_costs }}],
+                    backgroundColor: '#ffc107'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+
+    // Auto-calculate years from months
+    document.addEventListener('DOMContentLoaded', function() {
+        const remainingMonths = document.getElementById('{{ form.current_remaining_months.id_for_label }}');
+        const newTermMonths = document.getElementById('{{ form.new_term_months.id_for_label }}');
+        
+        function updateYearsDisplay(input) {
+            const months = parseInt(input.value);
+            if (months) {
+                const years = (months / 12).toFixed(1);
+                let helpText = input.parentNode.querySelector('.years-display');
+                if (!helpText) {
+                    helpText = document.createElement('small');
+                    helpText.className = 'form-text text-muted years-display';
+                    input.parentNode.appendChild(helpText);
+                }
+                helpText.textContent = `${years} years`;
+            }
+        }
+        
+        remainingMonths.addEventListener('input', () => updateYearsDisplay(remainingMonths));
+        newTermMonths.addEventListener('input', () => updateYearsDisplay(newTermMonths));
+        
+        // Initial display
+        updateYearsDisplay(remainingMonths);
+        updateYearsDisplay(newTermMonths);
+    });
+</script>
+{% endblock %}

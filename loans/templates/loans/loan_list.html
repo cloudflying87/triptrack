@@ -1,0 +1,92 @@
+{% extends 'loans/base.html' %}
+
+{% block page_title %}My Loans{% endblock %}
+
+{% block loans_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bank"></i> My Loans</h2>
+    <a href="{% url 'loans:add_loan' %}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add New Loan
+    </a>
+</div>
+
+{% if loans %}
+    <div class="row">
+        {% for loan in loans %}
+            <div class="col-md-6 mb-4">
+                <div class="card loan-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h5 class="card-title">
+                                    <a href="{% url 'loans:loan_detail' loan.id %}" class="text-decoration-none">
+                                        {{ loan.name }}
+                                    </a>
+                                </h5>
+                                <h6 class="card-subtitle text-muted">{{ loan.loan_type }}</h6>
+                                <small class="text-muted">{{ loan.lender|default:"" }}</small>
+                            </div>
+                            <span class="badge {% if loan.status == 'active' %}bg-success{% elif loan.status == 'paid_off' %}bg-secondary{% else %}bg-warning{% endif %}">
+                                {{ loan.get_status_display }}
+                            </span>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Current Balance</small>
+                                <div class="fw-bold">${{ loan.current_balance|floatformat:2 }}</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Monthly Payment</small>
+                                <div class="fw-bold">${{ loan.monthly_payment|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Interest Rate</small>
+                                <div>{{ loan.interest_rate }}%</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Remaining Payments</small>
+                                <div>{{ loan.get_remaining_payments }}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        {% with paid_percentage=loan.principal_amount|sub:loan.current_balance|div:loan.principal_amount|mul:100 %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Loan Progress</small>
+                                <small class="text-muted">{{ paid_percentage|floatformat:1 }}% paid</small>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {{ paid_percentage }}%"></div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'loans:loan_detail' loan.id %}" class="btn btn-outline-primary btn-sm flex-fill">
+                                <i class="bi bi-eye"></i> View Details
+                            </a>
+                            <a href="{% url 'loans:add_payment' loan.id %}" class="btn btn-outline-success btn-sm flex-fill">
+                                <i class="bi bi-plus"></i> Add Payment
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-bank text-muted" style="font-size: 4rem;"></i>
+        <h4 class="text-muted mt-3">No loans yet</h4>
+        <p class="text-muted">Start tracking your loans to see payment schedules and savings opportunities.</p>
+        <a href="{% url 'loans:add_loan' %}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> Add Your First Loan
+        </a>
+    </div>
+{% endif %}
+{% endblock %}

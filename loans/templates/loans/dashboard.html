@@ -1,0 +1,251 @@
+{% extends 'loans/base.html' %}
+{% load static %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block loans_content %}
+<div class="row">
+    <!-- Net Worth Overview -->
+    <div class="col-md-12 mb-4">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card metric-card positive h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-graph-up"></i> Investments
+                        </h5>
+                        <h3>${{ total_investment_value|floatformat:2 }}</h3>
+                        <small>{{ investment_count }} account{{ investment_count|pluralize }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card negative h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-bank"></i> Debt
+                        </h5>
+                        <h3>${{ total_loan_balance|floatformat:2 }}</h3>
+                        <small>{{ loan_count }} loan{{ loan_count|pluralize }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card {% if net_worth >= 0 %}positive{% else %}negative{% endif %} h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-calculator"></i> Net Worth
+                        </h5>
+                        <h3>${{ net_worth|floatformat:2 }}</h3>
+                        <small>Investments - Debt</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Quick Actions</h5>
+                        <div class="btn-group-vertical w-100">
+                            <a href="{% url 'loans:add_loan' %}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-plus"></i> Add Loan
+                            </a>
+                            <a href="{% url 'loans:add_investment' %}" class="btn btn-success btn-sm">
+                                <i class="bi bi-plus"></i> Add Investment
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Active Loans -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-bank"></i> Active Loans</h5>
+                <a href="{% url 'loans:loan_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if loans %}
+                    {% for loan in loans %}
+                        <div class="loan-card border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <a href="{% url 'loans:loan_detail' loan.id %}" class="text-decoration-none">
+                                            {{ loan.name }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">{{ loan.loan_type }}</small>
+                                    <div class="mt-2">
+                                        <div class="progress" style="height: 6px;">
+                                            {% with paid_percentage=loan.principal_amount|sub:loan.current_balance|div:loan.principal_amount|mul:100 %}
+                                                <div class="progress-bar" style="width: {{ paid_percentage }}%"></div>
+                                            {% endwith %}
+                                        </div>
+                                        <small class="text-muted">
+                                            ${{ loan.current_balance|floatformat:2 }} remaining
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">${{ loan.monthly_payment|floatformat:2 }}</div>
+                                    <small class="text-muted">{{ loan.interest_rate }}% APR</small>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-bank text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">No loans yet</p>
+                        <a href="{% url 'loans:add_loan' %}" class="btn btn-primary">Add Your First Loan</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Investments -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-graph-up"></i> Active Investments</h5>
+                <a href="{% url 'loans:investment_list' %}" class="btn btn-sm btn-outline-success">View All</a>
+            </div>
+            <div class="card-body">
+                {% if investments %}
+                    {% for investment in investments %}
+                        <div class="investment-card border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <a href="{% url 'loans:investment_detail' investment.id %}" class="text-decoration-none">
+                                            {{ investment.name }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">{{ investment.investment_type }}</small>
+                                    <div class="mt-2">
+                                        {% with return_pct=investment.get_return_percentage %}
+                                            <span class="badge {% if return_pct >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ return_pct|floatformat:2 }}% return
+                                            </span>
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">${{ investment.current_value|floatformat:2 }}</div>
+                                    <small class="text-muted">{{ investment.annual_return_rate }}% expected</small>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-graph-up text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">No investments yet</p>
+                        <a href="{% url 'loans:add_investment' %}" class="btn btn-success">Add Your First Investment</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & Upcoming Payments -->
+<div class="row mt-4">
+    <!-- Recent Payments -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-clock-history"></i> Recent Payments</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_payments %}
+                    <div class="list-group list-group-flush">
+                        {% for payment in recent_payments %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ payment.loan.name }}</h6>
+                                    <small class="text-muted">{{ payment.payment_date }}</small>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">${{ payment.amount|floatformat:2 }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent payments</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Payments -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calendar-check"></i> Upcoming Payments</h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_payments %}
+                    <div class="list-group list-group-flush">
+                        {% for payment in upcoming_payments %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ payment.loan.name }}</h6>
+                                    <small class="text-muted">Due: {{ payment.due_date }}</small>
+                                </div>
+                                <span class="badge bg-warning rounded-pill">${{ payment.scheduled_amount|floatformat:2 }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No upcoming payments</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calculator Quick Access -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Financial Calculators</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{% url 'loans:loan_calculator' %}" class="btn btn-outline-primary w-100 mb-3">
+                            <i class="bi bi-bank"></i><br>
+                            Loan Calculator
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'loans:extra_payment_calculator' %}" class="btn btn-outline-success w-100 mb-3">
+                            <i class="bi bi-plus-circle"></i><br>
+                            Extra Payment
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'loans:refinance_calculator' %}" class="btn btn-outline-info w-100 mb-3">
+                            <i class="bi bi-arrow-repeat"></i><br>
+                            Refinance
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{% url 'loans:investment_calculator' %}" class="btn btn-outline-warning w-100 mb-3">
+                            <i class="bi bi-graph-up"></i><br>
+                            Investment
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

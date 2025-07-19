@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'tracker',
+    'loans',
 ]
 
 MIDDLEWARE = [
