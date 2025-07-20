@@ -16,7 +16,7 @@ from .models import (
     Investment, InvestmentType, InvestmentTransaction
 )
 from .forms import (
-    LoanForm, PaymentForm, InvestmentForm, InvestmentTransactionForm,
+    LoanForm, PaymentForm, ManualPaymentForm, InvestmentForm, InvestmentTransactionForm,
     LoanCalculatorForm, ExtraPaymentCalculatorForm, RefinanceCalculatorForm,
     InvestmentCalculatorForm
 )
@@ -352,8 +352,8 @@ def loan_detail(request, loan_id):
     # Get scheduled payments
     scheduled_payments = loan.scheduled_payments.order_by('payment_number')
     
-    # Generate amortization schedule if none exists
-    if not scheduled_payments.exists():
+    # Generate amortization schedule if none exists (only for automatic payment loans)
+    if loan.payment_type == 'automatic' and not scheduled_payments.exists():
         schedule = generate_amortization_schedule(
             loan.principal_amount, 
             loan.interest_rate, 
@@ -376,12 +376,23 @@ def loan_detail(request, loan_id):
         
         scheduled_payments = loan.scheduled_payments.order_by('payment_number')
     
-    # Calculate remaining payments and payoff date
-    remaining_payments = loan.get_remaining_payments()
-    if remaining_payments > 0:
-        estimated_payoff = date.today() + relativedelta(months=remaining_payments)
+    # Calculate remaining payments and payoff date (only meaningful for automatic loans)
+    if loan.payment_type == 'automatic':
+        remaining_payments = loan.get_remaining_payments()
+        if remaining_payments > 0:
+            estimated_payoff = date.today() + relativedelta(months=remaining_payments)
+        else:
+            estimated_payoff = None
     else:
+        remaining_payments = None
         estimated_payoff = None
+    
+    # For manual payment loans, calculate accrued interest
+    accrued_interest = None
+    next_payment_breakdown = None
+    if loan.payment_type == 'manual':
+        accrued_interest = loan.calculate_accrued_interest()
+        next_payment_breakdown = loan.get_next_payment_breakdown()
     
     context = {
         'loan': loan,
@@ -391,6 +402,8 @@ def loan_detail(request, loan_id):
         'estimated_payoff': estimated_payoff,
         'total_paid': payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
         'total_interest_paid': payments.aggregate(total=Sum('interest_amount'))['total'] or Decimal('0.00'),
+        'accrued_interest': accrued_interest,
+        'next_payment_breakdown': next_payment_breakdown,
     }
     
     return render(request, 'loans/loan_detail.html', context)
@@ -526,25 +539,46 @@ def add_investment(request):
 def add_payment(request, loan_id):
     """Add a payment to a loan"""
     user_family = request.user.families.first()
-    loan = get_object_or_404(Loan, id=loan_id, family=user_family)
+    loan = get_object_or_404(Loan, id=loan_id)
+    
+    # Check if user can edit this loan
+    if not loan.can_edit(request.user):
+        messages.error(request, "You don't have permission to add payments to this loan.")
+        return redirect('loans:loan_detail', loan_id=loan.id)
+    
+    # Use different forms based on payment type
+    form_class = ManualPaymentForm if loan.payment_type == 'manual' else PaymentForm
     
     if request.method == 'POST':
-        form = PaymentForm(request.POST, loan=loan)
+        form = form_class(request.POST, loan=loan)
         if form.is_valid():
             payment = form.save(commit=False)
             payment.loan = loan
             payment.created_by = request.user
             payment.save()
             
-            messages.success(request, f"Payment of ${payment.amount} recorded successfully!")
+            # Show different success messages based on payment type
+            if loan.payment_type == 'manual':
+                breakdown = loan.get_next_payment_breakdown(payment.amount)
+                if breakdown:
+                    messages.success(request, 
+                        f"Payment of ${payment.amount} recorded! "
+                        f"Interest: ${payment.interest_amount:.2f}, "
+                        f"Principal: ${payment.principal_amount:.2f}")
+                else:
+                    messages.success(request, f"Payment of ${payment.amount} recorded successfully!")
+            else:
+                messages.success(request, f"Payment of ${payment.amount} recorded successfully!")
+            
             return redirect('loans:loan_detail', loan_id=loan.id)
     else:
-        form = PaymentForm(loan=loan)
+        form = form_class(loan=loan)
     
     return render(request, 'loans/payment_form.html', {
         'form': form,
         'loan': loan,
         'title': f'Add Payment to {loan.name}',
+        'is_manual_payment': loan.payment_type == 'manual',
     })
 
 

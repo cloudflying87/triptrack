@@ -23,6 +23,7 @@ from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm,
                   FamilyForm, FamilyMemberForm,MaintenanceScheduleForm)
 
 import logging
+import json
 logger = logging.getLogger('tracker')
 
 def landing_page_view(request):
@@ -315,8 +316,73 @@ class VehicleDetailView(LoginRequiredMixin, FamilyMemberRequiredMixin, DetailVie
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         vehicle = self.get_object()
+        
+        # Get recent events for the main events tab
         context['events'] = vehicle.events.order_by('-date')[:5]
         context['todo_items'] = vehicle.todo_items.filter(completed=False)
+        
+        # Calculate statistics for the statistics tab
+        all_events = vehicle.events.all()
+        
+        # Maintenance statistics
+        maintenance_events = all_events.filter(event_type='maintenance')
+        context['maintenance_count'] = maintenance_events.count()
+        context['total_maintenance_cost'] = maintenance_events.aggregate(
+            total=Sum('total_cost')
+        )['total'] or 0
+        
+        # Gas statistics
+        gas_events = all_events.filter(event_type='gas')
+        context['total_spent_on_gas'] = gas_events.aggregate(
+            total=Sum('total_cost')
+        )['total'] or 0
+        
+        # Total cost (maintenance + gas)
+        context['total_cost'] = context['total_maintenance_cost'] + context['total_spent_on_gas']
+        
+        # Fuel efficiency data for charts
+        if vehicle.type == 'car':
+            # MPG data for cars
+            mpg_data = []
+            gas_events_with_mpg = gas_events.filter(
+                milespergallon__isnull=False
+            ).order_by('date')
+            
+            for event in gas_events_with_mpg:
+                mpg_data.append({
+                    'date': event.date.strftime('%Y-%m-%d'),
+                    'mpg': float(event.milespergallon)
+                })
+            
+            context['mpg_data'] = json.dumps(mpg_data)
+            
+            # Calculate average MPG
+            avg_mpg = gas_events.filter(
+                milespergallon__isnull=False
+            ).aggregate(avg=Avg('milespergallon'))['avg']
+            context['avg_mpg'] = avg_mpg or 0
+            
+        elif vehicle.type == 'boat':
+            # GPH data for boats
+            gph_data = []
+            gas_events_with_gph = gas_events.filter(
+                gallonsperhour__isnull=False
+            ).order_by('date')
+            
+            for event in gas_events_with_gph:
+                gph_data.append({
+                    'date': event.date.strftime('%Y-%m-%d'),
+                    'gph': float(event.gallonsperhour)
+                })
+            
+            context['gph_data'] = json.dumps(gph_data)
+            
+            # Calculate average GPH
+            avg_gph = gas_events.filter(
+                gallonsperhour__isnull=False
+            ).aggregate(avg=Avg('gallonsperhour'))['avg']
+            context['avg_gph'] = avg_gph or 0
+        
         return context
 
 class VehicleCreateView(LoginRequiredMixin, CreateView):

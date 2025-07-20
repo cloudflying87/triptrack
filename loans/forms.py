@@ -11,7 +11,7 @@ class LoanForm(forms.ModelForm):
         fields = [
             'name', 'loan_type', 'lender', 'account_number',
             'principal_amount', 'interest_rate', 'term_months',
-            'monthly_payment', 'payment_frequency',
+            'payment_type', 'monthly_payment', 'payment_frequency',
             'start_date', 'first_payment_date', 'maturity_date',
             'is_variable_rate', 'notes'
         ]
@@ -34,6 +34,11 @@ class LoanForm(forms.ModelForm):
         # Make monthly_payment optional - it will be calculated if not provided
         self.fields['monthly_payment'].required = False
         self.fields['maturity_date'].required = False
+        
+        # Update field labels and help text based on payment type
+        self.fields['payment_type'].help_text = "Automatic: Regular scheduled payments. Manual: Sporadic payments with interest calculated daily."
+        self.fields['monthly_payment'].help_text = "For automatic: scheduled payment amount. For manual: typical/minimum payment amount."
+        self.fields['first_payment_date'].help_text = "For automatic: first scheduled payment. For manual: approximate first payment date."
 
     def clean(self):
         cleaned_data = super().clean()
@@ -86,6 +91,53 @@ class PaymentForm(forms.ModelForm):
             raise ValidationError("Principal + Interest + Escrow cannot exceed total payment amount.")
         
         return cleaned_data
+
+
+class ManualPaymentForm(forms.ModelForm):
+    """Special form for manual payment loans with automatic interest calculation"""
+    
+    class Meta:
+        model = Payment
+        fields = [
+            'payment_date', 'amount', 'notes'
+        ]
+        widgets = {
+            'payment_date': forms.DateInput(attrs={'type': 'date'}),
+            'amount': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01'}),
+            'notes': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.loan = kwargs.pop('loan', None)
+        super().__init__(*args, **kwargs)
+        
+        # Set default payment date to today
+        if not self.instance.pk:
+            self.fields['payment_date'].initial = date.today()
+        
+        # Add help text about automatic calculation
+        if self.loan and self.loan.payment_type == 'manual':
+            accrued_interest = self.loan.calculate_accrued_interest()
+            self.fields['amount'].help_text = f"Interest accrued to date: ${accrued_interest:.2f}. Principal and interest will be calculated automatically."
+
+    def save(self, commit=True):
+        payment = super().save(commit=False)
+        
+        if self.loan and self.loan.payment_type == 'manual':
+            # Calculate payment breakdown for manual loans
+            breakdown = self.loan.get_next_payment_breakdown(payment.amount)
+            if breakdown:
+                payment.interest_amount = breakdown['interest_portion']
+                payment.principal_amount = breakdown['principal_portion']
+                payment.payment_type = 'manual'
+        
+        if commit:
+            payment.save()
+            # Update loan balance for manual payment loans
+            if self.loan and self.loan.payment_type == 'manual':
+                self.loan.update_balance_after_payment(payment.amount, payment.payment_date)
+        
+        return payment
 
 
 class InvestmentForm(forms.ModelForm):

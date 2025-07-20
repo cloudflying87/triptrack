@@ -48,6 +48,11 @@ class Loan(models.Model):
         ('default', 'Default'),
     ]
     
+    PAYMENT_TYPE_CHOICES = [
+        ('automatic', 'Automatic Payments'),
+        ('manual', 'Manual Payments'),
+    ]
+    
     # Ownership and identification
     family = models.ForeignKey('tracker.Family', on_delete=models.CASCADE, related_name='loans')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_loans')
@@ -100,11 +105,17 @@ class Loan(models.Model):
     )
     
     # Payment details
+    payment_type = models.CharField(
+        max_length=20,
+        choices=PAYMENT_TYPE_CHOICES,
+        default='automatic',
+        help_text="Whether payments are automatic/scheduled or manual/sporadic"
+    )
     monthly_payment = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))],
-        help_text="Scheduled monthly payment amount"
+        help_text="Scheduled monthly payment amount (for automatic) or minimum payment (for manual)"
     )
     payment_frequency = models.CharField(
         max_length=20,
@@ -198,6 +209,67 @@ class Loan(models.Model):
         import math
         remaining = math.log(1 + (self.current_balance * monthly_rate) / self.monthly_payment) / math.log(1 + monthly_rate)
         return max(0, int(math.ceil(remaining)))
+    
+    def calculate_accrued_interest(self, from_date=None, to_date=None):
+        """Calculate interest accrued between two dates for manual payment loans"""
+        if self.payment_type != 'manual':
+            return Decimal('0.00')
+        
+        if not from_date:
+            # Get last payment date or loan start date
+            last_payment = self.payments.order_by('-payment_date').first()
+            from_date = last_payment.payment_date if last_payment else self.start_date
+        
+        if not to_date:
+            to_date = date.today()
+        
+        if from_date >= to_date:
+            return Decimal('0.00')
+        
+        days_diff = (to_date - from_date).days
+        daily_rate = self.interest_rate / 100 / 365
+        return round(self.current_balance * Decimal(str(daily_rate)) * days_diff, 2)
+    
+    def get_next_payment_breakdown(self, payment_amount=None):
+        """Get breakdown of next payment for manual payment loans"""
+        if self.payment_type != 'manual':
+            return None
+        
+        if not payment_amount:
+            payment_amount = self.monthly_payment
+        
+        # Calculate accrued interest to today
+        accrued_interest = self.calculate_accrued_interest()
+        
+        # Interest portion is the lesser of accrued interest or payment amount
+        interest_portion = min(accrued_interest, payment_amount)
+        
+        # Principal portion is the remainder
+        principal_portion = payment_amount - interest_portion
+        
+        # Can't pay more principal than the balance
+        principal_portion = min(principal_portion, self.current_balance)
+        
+        return {
+            'payment_amount': payment_amount,
+            'interest_portion': interest_portion,
+            'principal_portion': principal_portion,
+            'accrued_interest': accrued_interest,
+            'remaining_balance': self.current_balance - principal_portion
+        }
+    
+    def update_balance_after_payment(self, payment_amount, payment_date=None):
+        """Update loan balance after a manual payment"""
+        if self.payment_type != 'manual':
+            return
+        
+        if not payment_date:
+            payment_date = date.today()
+        
+        breakdown = self.get_next_payment_breakdown(payment_amount)
+        if breakdown:
+            self.current_balance = breakdown['remaining_balance']
+            self.save()
     
     def save(self, *args, **kwargs):
         # Auto-calculate monthly payment if not provided

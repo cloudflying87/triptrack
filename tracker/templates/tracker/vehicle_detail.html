@@ -180,6 +180,19 @@
                                 <div class="card-body">
                                     <h5 class="card-title">Fuel Efficiency (MPG)</h5>
                                     <canvas id="mpgChart" data-mpg-data="{{ mpg_data|safe }}"></canvas>
+                                    <div class="text-center mt-3">
+                                        <p>Average MPG: <strong>{{ avg_mpg|floatformat:1 }}</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% elif vehicle.type == 'boat' and gph_data %}
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Fuel Consumption (GPH)</h5>
+                                    <canvas id="gphChart" data-gph-data="{{ gph_data|safe }}"></canvas>
+                                    <div class="text-center mt-3">
+                                        <p>Average GPH: <strong>{{ avg_gph|floatformat:1 }}</strong></p>
+                                    </div>
                                 </div>
                             </div>
                         {% endif %}
@@ -240,5 +253,122 @@
 {% endblock %}
 
 {% block extra_js %}
-
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // MPG Chart for cars
+    const mpgChartCanvas = document.getElementById('mpgChart');
+    if (mpgChartCanvas) {
+        try {
+            const mpgDataString = mpgChartCanvas.getAttribute('data-mpg-data');
+            let mpgData = [];
+            try {
+                mpgData = JSON.parse(mpgDataString || '[]');
+            } catch (e) {
+                console.error("Error parsing MPG data:", e);
+            }
+            
+            if (mpgData.length > 0) {
+                new Chart(mpgChartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: mpgData.map(item => item.date),
+                        datasets: [{
+                            label: 'Miles Per Gallon (MPG)',
+                            data: mpgData.map(item => item.mpg),
+                            borderColor: '#4285f4',
+                            backgroundColor: 'rgba(66, 133, 244, 0.1)',
+                            tension: 0.1,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Miles Per Gallon'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fuel Efficiency Over Time'
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Error creating MPG chart:", error);
+        }
+    }
+    
+    // GPH Chart for boats
+    const gphChartCanvas = document.getElementById('gphChart');
+    if (gphChartCanvas) {
+        try {
+            const gphDataString = gphChartCanvas.getAttribute('data-gph-data');
+            let gphData = [];
+            try {
+                gphData = JSON.parse(gphDataString || '[]');
+            } catch (e) {
+                console.error("Error parsing GPH data:", e);
+            }
+            
+            if (gphData.length > 0) {
+                new Chart(gphChartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: gphData.map(item => item.date),
+                        datasets: [{
+                            label: 'Gallons Per Hour (GPH)',
+                            data: gphData.map(item => item.gph),
+                            borderColor: '#34a853',
+                            backgroundColor: 'rgba(52, 168, 83, 0.1)',
+                            tension: 0.1,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Gallons Per Hour'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fuel Consumption Over Time'
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Error creating GPH chart:", error);
+        }
+    }
+});
+</script>
 {% endblock %}

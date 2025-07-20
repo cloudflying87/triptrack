@@ -41,6 +41,14 @@
                                 <td>{{ loan.account_number|default:"Not specified" }}</td>
                             </tr>
                             <tr>
+                                <td class="text-muted">Payment Type:</td>
+                                <td>
+                                    <span class="badge {% if loan.payment_type == 'automatic' %}bg-info{% else %}bg-warning{% endif %}">
+                                        {{ loan.get_payment_type_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
                                 <td class="text-muted">Status:</td>
                                 <td>
                                     <span class="badge {% if loan.status == 'active' %}bg-success{% elif loan.status == 'paid_off' %}bg-secondary{% else %}bg-warning{% endif %}">
@@ -107,6 +115,14 @@
                     {% else %}
                     <div class="alert alert-success">
                         <i class="bi bi-check-circle"></i> Loan Paid Off!
+                    </div>
+                    {% endif %}
+                    
+                    {% if loan.payment_type == 'manual' and accrued_interest %}
+                    <div class="mt-3 p-3 border rounded bg-warning bg-opacity-10">
+                        <h6 class="text-warning"><i class="bi bi-clock"></i> Accrued Interest</h6>
+                        <div class="fs-5 fw-bold text-danger">${{ accrued_interest|floatformat:2 }}</div>
+                        <small class="text-muted">Interest since last payment</small>
                     </div>
                     {% endif %}
                 </div>
@@ -227,8 +243,8 @@
     </div>
 </div>
 
-<!-- Amortization Schedule -->
-{% if scheduled_payments %}
+<!-- Amortization Schedule (only for automatic payment loans) -->
+{% if scheduled_payments and loan.payment_type == 'automatic' %}
 <div class="row">
     <div class="col-12">
         <div class="card">
@@ -278,6 +294,55 @@
                         Actual payments may differ based on extra payments made.
                     </small>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Next Payment Preview (for manual payment loans) -->
+{% if loan.payment_type == 'manual' and next_payment_breakdown %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Next Payment Breakdown</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <small class="text-muted">If you pay</small>
+                            <div class="fs-5 fw-bold">${{ next_payment_breakdown.payment_amount|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <small class="text-muted">Interest Portion</small>
+                            <div class="fs-5 fw-bold text-danger">${{ next_payment_breakdown.interest_portion|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <small class="text-muted">Principal Portion</small>
+                            <div class="fs-5 fw-bold text-success">${{ next_payment_breakdown.principal_portion|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <small class="text-muted">Remaining Balance</small>
+                            <div class="fs-5 fw-bold">${{ next_payment_breakdown.remaining_balance|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if next_payment_breakdown.accrued_interest > next_payment_breakdown.payment_amount %}
+                <div class="mt-3 alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Note:</strong> Your default payment amount is less than the accrued interest. 
+                    Consider paying at least ${{ next_payment_breakdown.accrued_interest|floatformat:2 }} to cover all interest.
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
