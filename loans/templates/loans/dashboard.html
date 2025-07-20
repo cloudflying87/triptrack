@@ -194,13 +194,32 @@
                 {% if upcoming_payments %}
                     <div class="list-group list-group-flush">
                         {% for payment in upcoming_payments %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{% url 'loans:add_payment' payment.loan.id %}?scheduled_payment={{ payment.id }}" 
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">{{ payment.loan.name }}</h6>
-                                    <small class="text-muted">Due: {{ payment.due_date }}</small>
+                                    <small class="text-muted">Due: {{ payment.due_date|date:"M d, Y" }}</small>
+                                    <div class="mt-1">
+                                        <small class="text-success">
+                                            <i class="bi bi-hand-index"></i> Click to record this payment
+                                        </small>
+                                    </div>
                                 </div>
-                                <span class="badge bg-warning rounded-pill">${{ payment.scheduled_amount|floatformat:2 }}</span>
-                            </div>
+                                <div class="text-end">
+                                    <span class="badge bg-warning rounded-pill">${{ payment.scheduled_amount|floatformat:2 }}</span>
+                                    <div class="mt-1">
+                                        <small class="text-muted">
+                                            {% if payment.due_date == today %}
+                                                Due today
+                                            {% elif payment.due_date < today %}
+                                                <span class="text-danger">Overdue</span>
+                                            {% else %}
+                                                In {{ payment.due_date|timeuntil|floatformat:0 }}
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </a>
                         {% endfor %}
                     </div>
                 {% else %}
@@ -249,4 +268,25 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .list-group-item-action:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .list-group-item-action {
+        transition: all 0.2s ease-in-out;
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .list-group-item-action:hover .text-success {
+        color: #198754 !important;
+    }
+</style>
 {% endblock %}

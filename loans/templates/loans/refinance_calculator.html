@@ -310,6 +310,63 @@
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    // Handle existing loan selection
+    document.addEventListener('DOMContentLoaded', function() {
+        const loanSelect = document.getElementById('{{ form.existing_loan.id_for_label }}');
+        const balanceField = document.getElementById('{{ form.current_balance.id_for_label }}');
+        const rateField = document.getElementById('{{ form.current_interest_rate.id_for_label }}');
+        const monthsField = document.getElementById('{{ form.current_remaining_months.id_for_label }}');
+        
+        // Store loan data
+        const loanData = {
+            {% for loan in form.existing_loan.field.queryset %}
+            '{{ loan.id }}': {
+                balance: {{ loan.current_balance }},
+                rate: {{ loan.interest_rate }},
+                months: {{ loan.get_remaining_payments }}
+            },
+            {% endfor %}
+        };
+        
+        // Update fields when loan is selected
+        loanSelect.addEventListener('change', function() {
+            const selectedLoanId = this.value;
+            
+            if (selectedLoanId && loanData[selectedLoanId]) {
+                const data = loanData[selectedLoanId];
+                balanceField.value = data.balance;
+                rateField.value = data.rate;
+                monthsField.value = data.months;
+                
+                // Make fields read-only when a loan is selected (not disabled so they still submit)
+                balanceField.readOnly = true;
+                rateField.readOnly = true;
+                monthsField.readOnly = true;
+                
+                // Add visual feedback
+                balanceField.style.backgroundColor = '#f0f0f0';
+                rateField.style.backgroundColor = '#f0f0f0';
+                monthsField.style.backgroundColor = '#f0f0f0';
+            } else {
+                // Enable fields when no loan is selected
+                balanceField.readOnly = false;
+                rateField.readOnly = false;
+                monthsField.readOnly = false;
+                
+                // Remove visual feedback
+                balanceField.style.backgroundColor = '';
+                rateField.style.backgroundColor = '';
+                monthsField.style.backgroundColor = '';
+            }
+        });
+        
+        // Trigger change event if a loan is pre-selected
+        if (loanSelect.value) {
+            loanSelect.dispatchEvent(new Event('change'));
+        }
+    });
+    </script>
+<script>
     {% if result %}
     // Create refinance comparison chart
     const ctx = document.getElementById('refinanceChart').getContext('2d');

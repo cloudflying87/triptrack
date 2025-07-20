@@ -59,6 +59,23 @@
                     
                     <!-- Loan Terms -->
                     <h5 class="text-primary mb-3 mt-4">Loan Terms</h5>
+                    
+                    <!-- Payment Type -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="{{ form.payment_type.id_for_label }}" class="form-label">{{ form.payment_type.label }}</label>
+                                {{ form.payment_type }}
+                                {% if form.payment_type.help_text %}
+                                    <div class="form-text">{{ form.payment_type.help_text }}</div>
+                                {% endif %}
+                                {% if form.payment_type.errors %}
+                                    <div class="text-danger">{{ form.payment_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -95,7 +112,7 @@
                             <div class="mb-3">
                                 <label for="{{ form.monthly_payment.id_for_label }}" class="form-label">{{ form.monthly_payment.label }}</label>
                                 {{ form.monthly_payment }}
-                                <div class="form-text">Leave blank to auto-calculate</div>
+                                <div class="form-text" id="monthly-payment-help">Leave blank to auto-calculate</div>
                                 {% if form.monthly_payment.errors %}
                                     <div class="text-danger">{{ form.monthly_payment.errors.0 }}</div>
                                 {% endif %}
@@ -137,8 +154,9 @@
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="{{ form.first_payment_date.id_for_label }}" class="form-label">{{ form.first_payment_date.label }}</label>
+                                <label for="{{ form.first_payment_date.id_for_label }}" class="form-label" id="first-payment-label">{{ form.first_payment_date.label }}</label>
                                 {{ form.first_payment_date }}
+                                <div class="form-text" id="first-payment-help"></div>
                                 {% if form.first_payment_date.errors %}
                                     <div class="text-danger">{{ form.first_payment_date.errors.0 }}</div>
                                 {% endif %}
@@ -186,6 +204,10 @@
     document.addEventListener('DOMContentLoaded', function() {
         const termMonths = document.getElementById('{{ form.term_months.id_for_label }}');
         const termYears = document.getElementById('term-years');
+        const paymentType = document.getElementById('{{ form.payment_type.id_for_label }}');
+        const monthlyPaymentHelp = document.getElementById('monthly-payment-help');
+        const firstPaymentLabel = document.getElementById('first-payment-label');
+        const firstPaymentHelp = document.getElementById('first-payment-help');
         
         function updateYearsDisplay() {
             const months = parseInt(termMonths.value);
@@ -197,8 +219,26 @@
             }
         }
         
+        function updatePaymentTypeHelp() {
+            const selectedType = paymentType.value;
+            
+            if (selectedType === 'manual') {
+                monthlyPaymentHelp.innerHTML = '<strong>Manual Payments:</strong> Enter typical or minimum payment amount. Actual payments will be recorded individually.';
+                firstPaymentLabel.textContent = 'Approximate First Payment Date';
+                firstPaymentHelp.textContent = 'Estimated date for first manual payment (for reference only)';
+            } else {
+                monthlyPaymentHelp.innerHTML = '<strong>Automatic Payments:</strong> Leave blank to auto-calculate or enter specific amount for scheduled payments.';
+                firstPaymentLabel.textContent = 'First Payment Date';
+                firstPaymentHelp.textContent = 'Date when first scheduled payment is due';
+            }
+        }
+        
         termMonths.addEventListener('input', updateYearsDisplay);
-        updateYearsDisplay(); // Initial call
+        paymentType.addEventListener('change', updatePaymentTypeHelp);
+        
+        // Initial calls
+        updateYearsDisplay();
+        updatePaymentTypeHelp();
     });
 </script>
 {% endblock %}

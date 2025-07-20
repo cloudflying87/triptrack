@@ -1,0 +1,225 @@
+{% extends 'loans/base.html' %}
+{% load static %}
+{% load loan_extras %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block loans_content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-credit-card"></i> {{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <!-- Loan Summary -->
+                <div class="alert alert-info">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Loan</small>
+                            <div class="fw-bold">{{ loan.name }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Current Balance</small>
+                            <div class="fw-bold">${{ loan.current_balance|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    {% if loan.payment_type == 'manual' %}
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Interest Rate</small>
+                            <div>{{ loan.interest_rate|floatformat:2 }}% APR</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Accrued Interest</small>
+                            <div class="text-danger fw-bold">${{ loan.calculate_accrued_interest|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Monthly Payment</small>
+                            <div>${{ loan.monthly_payment|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Interest Rate</small>
+                            <div>{{ loan.interest_rate|floatformat:2 }}% APR</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if scheduled_payment %}
+                <div class="alert alert-info">
+                    <i class="bi bi-calendar-check"></i>
+                    <strong>Scheduled Payment:</strong> You're recording the scheduled payment due on {{ scheduled_payment.due_date|date:"M d, Y" }} 
+                    for ${{ scheduled_payment.scheduled_amount|floatformat:2 }}. The form has been pre-filled with the expected values.
+                </div>
+                {% elif is_manual_payment %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Manual Payment Loan:</strong> Interest and principal will be calculated automatically based on the payment date and amount.
+                </div>
+                {% endif %}
+                
+                <!-- Payment Form -->
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger">{{ field.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    {% if scheduled_payment %}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="mark_scheduled_paid" name="mark_scheduled_paid" value="true" checked>
+                        <label class="form-check-label" for="mark_scheduled_paid">
+                            Mark scheduled payment as completed
+                        </label>
+                        <div class="form-text">This will mark the scheduled payment due {{ scheduled_payment.due_date|date:"M d, Y" }} as paid and remove it from upcoming payments.</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Record Payment
+                        </button>
+                        <a href="{% url 'loans:loan_detail' loan.id %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+                
+                <!-- Recent Payments -->
+                <div class="mt-4">
+                    <h6 class="text-muted">Recent Payments</h6>
+                    {% with recent_payments=loan.payments.all|slice:":5" %}
+                    {% if recent_payments %}
+                    <div class="list-group">
+                        {% for payment in recent_payments %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <small class="text-muted">{{ payment.payment_date|date:"M d, Y" }}</small>
+                                    <div class="fw-bold">${{ payment.amount|floatformat:2 }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">Principal</small>
+                                    <div class="text-success">${{ payment.principal_amount|floatformat:2 }}</div>
+                                    <small class="text-muted">Interest</small>
+                                    <div class="text-danger">${{ payment.interest_amount|floatformat:2 }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No payments recorded yet.</p>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if is_manual_payment %}
+<!-- Payment Calculator for Manual Loans -->
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Payment Calculator</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">See how different payment amounts will be applied to your loan.</p>
+                
+                <div class="input-group mb-3">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control" id="calc-amount" placeholder="Enter payment amount" step="0.01" min="0.01">
+                    <button class="btn btn-outline-secondary" type="button" onclick="calculatePayment()">
+                        <i class="bi bi-calculator"></i> Calculate
+                    </button>
+                </div>
+                
+                <div id="calc-results" style="display: none;">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Interest Portion</small>
+                            <div class="fs-5 text-danger" id="calc-interest">$0.00</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Principal Portion</small>
+                            <div class="fs-5 text-success" id="calc-principal">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <small class="text-muted">Remaining Balance After Payment</small>
+                            <div class="fs-5" id="calc-balance">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if is_manual_payment %}
+<script>
+function calculatePayment() {
+    const amount = parseFloat(document.getElementById('calc-amount').value);
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid payment amount.');
+        return;
+    }
+    
+    const currentBalance = {{ loan.current_balance }};
+    const accruedInterest = {{ loan.calculate_accrued_interest }};
+    
+    // Calculate breakdown
+    const interestPortion = Math.min(amount, accruedInterest);
+    const principalPortion = Math.min(amount - interestPortion, currentBalance);
+    const remainingBalance = currentBalance - principalPortion;
+    
+    // Display results
+    document.getElementById('calc-interest').textContent = '$' + interestPortion.toFixed(2);
+    document.getElementById('calc-principal').textContent = '$' + principalPortion.toFixed(2);
+    document.getElementById('calc-balance').textContent = '$' + remainingBalance.toFixed(2);
+    document.getElementById('calc-results').style.display = 'block';
+    
+    // Update form field with calculated amount
+    const amountField = document.querySelector('input[name="amount"]');
+    if (amountField) {
+        amountField.value = amount.toFixed(2);
+    }
+}
+
+// Auto-calculate when amount field changes
+document.addEventListener('DOMContentLoaded', function() {
+    const amountField = document.querySelector('input[name="amount"]');
+    if (amountField) {
+        amountField.addEventListener('input', function() {
+            document.getElementById('calc-amount').value = this.value;
+            if (this.value) {
+                calculatePayment();
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

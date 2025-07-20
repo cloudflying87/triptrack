@@ -89,6 +89,7 @@ def dashboard(request):
         'upcoming_payments': upcoming_payments,
         'loan_count': len(viewable_loans),
         'investment_count': len(viewable_investments),
+        'today': date.today(),
     }
     
     return render(request, 'loans/dashboard.html', context)
@@ -189,6 +190,14 @@ def refinance_calculator(request):
     existing_loan = None
     can_create_refinance = False
     
+    # Check if a loan ID was passed in the URL
+    loan_id = request.GET.get('loan')
+    if loan_id and user_family:
+        try:
+            existing_loan = Loan.objects.get(id=loan_id, family=user_family, status='active')
+        except Loan.DoesNotExist:
+            existing_loan = None
+    
     if request.method == 'POST':
         form = RefinanceCalculatorForm(request.POST, user_family=user_family)
         if form.is_valid():
@@ -226,7 +235,16 @@ def refinance_calculator(request):
                 result['original_principal'] = existing_loan.principal_amount
                 result['lifetime_savings'] = calculate_lifetime_savings(existing_loan, result)
     else:
-        form = RefinanceCalculatorForm(user_family=user_family)
+        # Initialize form with existing loan if provided
+        initial_data = {}
+        if existing_loan:
+            initial_data = {
+                'existing_loan': existing_loan,
+                'current_balance': existing_loan.current_balance,
+                'current_interest_rate': existing_loan.interest_rate,
+                'current_remaining_months': existing_loan.get_remaining_payments(),
+            }
+        form = RefinanceCalculatorForm(user_family=user_family, initial=initial_data)
     
     return render(request, 'loans/refinance_calculator.html', {
         'form': form,
@@ -546,6 +564,19 @@ def add_payment(request, loan_id):
         messages.error(request, "You don't have permission to add payments to this loan.")
         return redirect('loans:loan_detail', loan_id=loan.id)
     
+    # Check for scheduled payment ID in URL parameters
+    scheduled_payment_id = request.GET.get('scheduled_payment')
+    scheduled_payment = None
+    if scheduled_payment_id:
+        try:
+            scheduled_payment = ScheduledPayment.objects.get(
+                id=scheduled_payment_id, 
+                loan=loan, 
+                is_paid=False
+            )
+        except ScheduledPayment.DoesNotExist:
+            scheduled_payment = None
+    
     # Use different forms based on payment type
     form_class = ManualPaymentForm if loan.payment_type == 'manual' else PaymentForm
     
@@ -556,6 +587,12 @@ def add_payment(request, loan_id):
             payment.loan = loan
             payment.created_by = request.user
             payment.save()
+            
+            # Mark scheduled payment as paid if this was from a scheduled payment
+            if scheduled_payment and request.POST.get('mark_scheduled_paid') == 'true':
+                scheduled_payment.is_paid = True
+                scheduled_payment.actual_payment = payment
+                scheduled_payment.save()
             
             # Show different success messages based on payment type
             if loan.payment_type == 'manual':
@@ -568,17 +605,30 @@ def add_payment(request, loan_id):
                 else:
                     messages.success(request, f"Payment of ${payment.amount} recorded successfully!")
             else:
-                messages.success(request, f"Payment of ${payment.amount} recorded successfully!")
+                success_msg = f"Payment of ${payment.amount} recorded successfully!"
+                if scheduled_payment and request.POST.get('mark_scheduled_paid') == 'true':
+                    success_msg += f" Scheduled payment for {scheduled_payment.due_date} marked as paid."
+                messages.success(request, success_msg)
             
             return redirect('loans:loan_detail', loan_id=loan.id)
     else:
-        form = form_class(loan=loan)
+        # Pre-fill form with scheduled payment data if available
+        initial_data = {}
+        if scheduled_payment:
+            initial_data = {
+                'payment_date': scheduled_payment.due_date,
+                'amount': scheduled_payment.scheduled_amount,
+                'principal_amount': scheduled_payment.principal_amount,
+                'interest_amount': scheduled_payment.interest_amount,
+            }
+        form = form_class(loan=loan, initial=initial_data)
     
     return render(request, 'loans/payment_form.html', {
         'form': form,
         'loan': loan,
         'title': f'Add Payment to {loan.name}',
         'is_manual_payment': loan.payment_type == 'manual',
+        'scheduled_payment': scheduled_payment,
     })
 
 
