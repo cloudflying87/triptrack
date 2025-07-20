@@ -507,14 +507,25 @@ def add_loan(request):
     if request.method == 'POST':
         form = LoanForm(request.POST)
         if form.is_valid():
-            loan = form.save(commit=False)
-            loan.family = user_family
-            loan.created_by = request.user
-            loan.current_balance = loan.principal_amount  # Set initial balance
-            loan.save()
-            
-            messages.success(request, f"Loan '{loan.name}' added successfully!")
-            return redirect('loans:loan_detail', loan_id=loan.id)
+            try:
+                loan = form.save(commit=False)
+                loan.family = user_family
+                loan.created_by = request.user
+                loan.current_balance = loan.principal_amount  # Set initial balance
+                loan.save()
+                
+                messages.success(request, f"Loan '{loan.name}' added successfully!")
+                return redirect('loans:loan_detail', loan_id=loan.id)
+            except Exception as e:
+                messages.error(request, f"Error saving loan: {str(e)}")
+        else:
+            # Debug: Show form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+            if form.non_field_errors():
+                for error in form.non_field_errors():
+                    messages.error(request, f"Form error: {error}")
     else:
         form = LoanForm()
     

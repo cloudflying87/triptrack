@@ -10,6 +10,7 @@ RESTORE=false
 ALL=false
 MIGRATE=false
 DOWNLOAD=false
+SETUP=false
 REMOTE_SERVER="davidhale87@172.16.205.4"
 REMOTE_BACKUP_DIR="/halefiles/Coding/TripTrackDBBackups"
 
@@ -36,6 +37,7 @@ show_help() {
     echo "  -o, --restore     Restore database from backup"
     echo "  -m, --migrate     Run Django migrations"
     echo "  -w, --download    Download backup from remote server"
+    echo "  -u, --setup       Run setup commands (loan types, maintenance categories, schedules)"
     echo ""
     echo "Example:"
     echo "  $0 -b -d 2023-05-13       # Backup with date 2023-05-13"
@@ -90,6 +92,28 @@ run_migrations() {
     echo "Applying database migrations..."
     sudo docker compose exec triptracker python manage.py migrate
     echo "✓ Migrations completed"
+}
+
+# Function to run setup commands
+run_setup() {
+    echo "Running setup commands..."
+    
+    # Set up loan and investment types
+    echo "Setting up loan and investment types..."
+    sudo docker compose exec triptracker python manage.py setup_loan_types
+    echo "✓ Loan and investment types set up"
+    
+    # Update maintenance categories with vehicle types
+    echo "Updating maintenance categories..."
+    sudo docker compose exec triptracker python manage.py update_maintenance_categories
+    echo "✓ Maintenance categories updated"
+    
+    # Create default maintenance schedules for existing vehicles
+    echo "Creating default maintenance schedules..."
+    sudo docker compose exec triptracker python manage.py create_default_schedules --user-id=1
+    echo "✓ Default maintenance schedules created"
+    
+    echo "Setup completed!"
 }
 
 # Function to backup database (all formats)
@@ -340,6 +364,10 @@ while [[ $# -gt 0 ]]; do
             DOWNLOAD=true
             shift
             ;;
+        -u|--setup)
+            SETUP=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
             show_help
@@ -370,6 +398,7 @@ echo "Soft Rebuild: $SOFT_REBUILD"
 echo "Restore: $RESTORE"
 echo "Migrate: $MIGRATE"
 echo "Download: $DOWNLOAD"
+echo "Setup: $SETUP"
 echo "-----------------------------------"
 
 # Execute operations
@@ -469,6 +498,11 @@ fi
 # Standalone migrate
 if [ "$MIGRATE" = true ] && [ "$REBUILD" = false ] && [ "$SOFT_REBUILD" = false ]; then
     run_migrations
+fi
+
+# Standalone setup
+if [ "$SETUP" = true ]; then
+    run_setup
 fi
 
 echo "Build script completed successfully!"
