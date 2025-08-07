@@ -16,7 +16,6 @@ def health_check(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('tracker.urls')),  # Include the app's URLs
-    path('loans/', include('loans.urls')),  # Include the loans app URLs
     
     # Add these if you want to use Django's built-in auth views with your custom templates
     path('accounts/', include('django.contrib.auth.urls')),

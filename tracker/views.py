@@ -1352,6 +1352,13 @@ def debug_info(request):
         'allowed_hosts': settings.ALLOWED_HOSTS,
         'database_url': os.environ.get('DATABASE_URL', 'Not set'),
         'redis_url': os.environ.get('REDIS_URL', 'Not set'),
+        'db_settings': {
+            'ENGINE': settings.DATABASES['default'].get('ENGINE', 'Not set'),
+            'NAME': settings.DATABASES['default'].get('NAME', 'Not set'),
+            'USER': settings.DATABASES['default'].get('USER', 'Not set'),
+            'HOST': settings.DATABASES['default'].get('HOST', 'Not set'),
+            'PORT': settings.DATABASES['default'].get('PORT', 'Not set'),
+        },
         'environment_vars': {
             'DEBUG': os.environ.get('DEBUG'),
             'SECRET_KEY': 'SET' if os.environ.get('SECRET_KEY') else 'NOT SET',

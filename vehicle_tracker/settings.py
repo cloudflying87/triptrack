@@ -36,7 +36,6 @@ INSTALLED_APPS = [
     
     # Local apps
     'tracker',
-    'loans',
 ]
 
 MIDDLEWARE = [
@@ -76,12 +75,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'vehicle_tracker.wsgi.application'
 
 # Database
-DATABASES = {
-    'default': dj_database_url.config(
-        default=f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME')}",
-        conn_max_age=600
-    )
-}
+# If DATABASE_URL is set (e.g., by Docker), use it directly
+# Otherwise, construct it from individual environment variables
+if os.environ.get('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600)
+    }
+else:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME')}",
+            conn_max_age=600
+        )
+    }
 
 # Caching
 CACHES = {
