@@ -949,6 +949,9 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         else:
             avg_mpg = 0
 
+        # Determine reading label based on vehicle type
+        reading_label = 'Miles' if vehicle.type == 'car' else 'Hours'
+
         # Calculate monthly usage statistics
         monthly_stats = (
             events
@@ -1030,7 +1033,6 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         if vehicle.type == 'car':
             last_reading_event = events.filter(miles__isnull=False).order_by('-date', '-miles').first()
             last_reading = last_reading_event.miles if last_reading_event else None
-            reading_label = 'Miles'
 
             # Get start of year reading
             year_start_event = events.filter(
@@ -1043,7 +1045,6 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         else:
             last_reading_event = events.filter(hours__isnull=False).order_by('-date', '-hours').first()
             last_reading = last_reading_event.hours if last_reading_event else None
-            reading_label = 'Hours'
 
             # Get start of year reading
             year_start_event = events.filter(
