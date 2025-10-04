@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic.edit import FormView
 from django.contrib import messages
 from django.db.models import Sum, Count, Avg, F, Q
+from django.db.models.functions import TruncMonth
 from datetime import datetime, timedelta
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse_lazy
@@ -919,10 +920,10 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         if end_date:
             events = events.filter(date__lte=end_date)
         
-        # Group events by type
-        maintenance_events = events.filter(event_type='maintenance')
-        gas_events = events.filter(event_type='gas')
-        outing_events = events.filter(event_type='outing')
+        # Group events by type (ordered by newest first)
+        maintenance_events = events.filter(event_type='maintenance').order_by('-date')
+        gas_events = events.filter(event_type='gas').order_by('-date')
+        outing_events = events.filter(event_type='outing').order_by('-date')
         
         # Calculate statistics
         total_maintenance_cost = maintenance_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
@@ -947,7 +948,30 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             avg_mpg = sum(item['mpg'] for item in mpg_data) / len(mpg_data)
         else:
             avg_mpg = 0
-        
+
+        # Calculate monthly usage statistics
+        monthly_stats = (
+            events
+            .annotate(month=TruncMonth('date'))
+            .values('month')
+            .annotate(
+                maintenance_cost=Sum('total_cost', filter=Q(event_type='maintenance')),
+                gas_cost=Sum('total_cost', filter=Q(event_type='gas')),
+                total_cost=Sum('total_cost')
+            )
+            .order_by('-month')
+        )
+
+        # Get last recorded mileage or hours
+        if vehicle.type == 'car':
+            last_reading_event = events.filter(miles__isnull=False).order_by('-date', '-miles').first()
+            last_reading = last_reading_event.miles if last_reading_event else None
+            reading_label = 'Miles'
+        else:
+            last_reading_event = events.filter(hours__isnull=False).order_by('-date', '-hours').first()
+            last_reading = last_reading_event.hours if last_reading_event else None
+            reading_label = 'Hours'
+
         context.update({
             'maintenance_events': maintenance_events,
             'gas_events': gas_events,
@@ -957,6 +981,9 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             'total_cost': total_maintenance_cost + total_gas_cost,
             'avg_mpg': avg_mpg,
             'mpg_data': mpg_data_json,  # Now a properly formatted JSON string
+            'monthly_stats': monthly_stats,
+            'last_reading': last_reading,
+            'reading_label': reading_label,
             'start_date': start_date,
             'end_date': end_date,
         })

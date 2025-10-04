@@ -44,15 +44,24 @@
                         <dl>
                             <dt>Make</dt>
                             <dd>{{ vehicle.make }}</dd>
-                            
+
                             <dt>Model</dt>
                             <dd>{{ vehicle.model }}</dd>
-                            
+
                             <dt>Year</dt>
                             <dd>{{ vehicle.year }}</dd>
-                            
+
                             <dt>Type</dt>
                             <dd>{{ vehicle.get_type_display }}</dd>
+
+                            <dt>Last Recorded {{ reading_label }}</dt>
+                            <dd>
+                                {% if last_reading %}
+                                    {{ last_reading }}
+                                {% else %}
+                                    No data
+                                {% endif %}
+                            </dd>
                         </dl>
                     </div>
                     <div class="col-md-6">
@@ -102,6 +111,62 @@
         </div>
     </div>
 </div>
+
+{% if monthly_stats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Monthly Usage Breakdown</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Maintenance Cost</th>
+                                <th>Fuel Cost</th>
+                                <th>Total Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in monthly_stats %}
+                                <tr>
+                                    <td>{{ stat.month|date:"F Y" }}</td>
+                                    <td>
+                                        {% if stat.maintenance_cost %}
+                                            ${{ stat.maintenance_cost|floatformat:2 }}
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.gas_cost %}
+                                            ${{ stat.gas_cost|floatformat:2 }}
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>
+                                            {% if stat.total_cost %}
+                                                ${{ stat.total_cost|floatformat:2 }}
+                                            {% else %}
+                                                $0.00
+                                            {% endif %}
+                                        </strong>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if vehicle.type == 'car' and mpg_data %}
 <div class="row mb-4">
@@ -190,36 +255,58 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
-                                    <th>Gallons</th>
-                                    <th>Cost</th>
-                                    <th>MPG</th>
+                                    {% if vehicle.type == 'car' %}
+                                        <th>Gallons</th>
+                                        <th>Cost</th>
+                                        <th>MPG</th>
+                                    {% else %}
+                                        <th>Hours</th>
+                                        <th>Cost</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for event in gas_events %}
                                     <tr>
                                         <td>{{ event.date|date:"M d, Y" }}</td>
-                                        <td>
-                                            {% if event.gallons %}
-                                                {{ event.gallons }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if event.total_cost %}
-                                                ${{ event.total_cost }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if event.get_mpg %}
-                                                {{ event.get_mpg }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
+                                        {% if vehicle.type == 'car' %}
+                                            <td>
+                                                {% if event.gallons %}
+                                                    {{ event.gallons }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if event.total_cost %}
+                                                    ${{ event.total_cost }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if event.get_mpg %}
+                                                    {{ event.get_mpg }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        {% else %}
+                                            <td>
+                                                {% if event.hours %}
+                                                    {{ event.hours }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if event.total_cost %}
+                                                    ${{ event.total_cost }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
                                     </tr>
                                 {% endfor %}
                             </tbody>
