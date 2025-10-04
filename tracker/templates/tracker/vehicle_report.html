@@ -62,6 +62,24 @@
                                     No data
                                 {% endif %}
                             </dd>
+
+                            <dt>Year Start {{ reading_label }}</dt>
+                            <dd>
+                                {% if year_start_reading %}
+                                    {{ year_start_reading }}
+                                {% else %}
+                                    No data
+                                {% endif %}
+                            </dd>
+
+                            <dt>Year-to-Date {{ reading_label }}</dt>
+                            <dd>
+                                {% if ytd_usage %}
+                                    <strong>{{ ytd_usage }}</strong> {{ reading_label|lower }}
+                                {% else %}
+                                    No data
+                                {% endif %}
+                            </dd>
                         </dl>
                     </div>
                     <div class="col-md-6">
@@ -112,6 +130,70 @@
     </div>
 </div>
 
+{% if yearly_usage %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Yearly Usage History</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Usage ({{ reading_label }})</th>
+                                <th>Maintenance Cost</th>
+                                <th>Fuel Cost</th>
+                                <th>Total Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in yearly_usage %}
+                                <tr>
+                                    <td>{{ stat.year|date:"Y" }}</td>
+                                    <td>
+                                        {% if stat.usage %}
+                                            <strong>{{ stat.usage }}</strong> {{ stat.unit }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.maintenance_cost %}
+                                            ${{ stat.maintenance_cost|floatformat:2 }}
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.gas_cost %}
+                                            ${{ stat.gas_cost|floatformat:2 }}
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>
+                                            {% if stat.total_cost %}
+                                                ${{ stat.total_cost|floatformat:2 }}
+                                            {% else %}
+                                                $0.00
+                                            {% endif %}
+                                        </strong>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if monthly_stats %}
 <div class="row mb-4">
     <div class="col-12">
@@ -125,6 +207,7 @@
                         <thead>
                             <tr>
                                 <th>Month</th>
+                                <th>{{ reading_label }}</th>
                                 <th>Maintenance Cost</th>
                                 <th>Fuel Cost</th>
                                 <th>Total Cost</th>
@@ -134,6 +217,15 @@
                             {% for stat in monthly_stats %}
                                 <tr>
                                     <td>{{ stat.month|date:"F Y" }}</td>
+                                    <td>
+                                        {% if vehicle.type == 'car' and stat.max_miles %}
+                                            {{ stat.max_miles }}
+                                        {% elif vehicle.type != 'car' and stat.max_hours %}
+                                            {{ stat.max_hours }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if stat.maintenance_cost %}
                                             ${{ stat.maintenance_cost|floatformat:2 }}
@@ -257,11 +349,10 @@
                                     <th>Date</th>
                                     {% if vehicle.type == 'car' %}
                                         <th>Gallons</th>
-                                        <th>Cost</th>
                                         <th>MPG</th>
                                     {% else %}
                                         <th>Hours</th>
-                                        <th>Cost</th>
+                                        <th>Gallons</th>
                                     {% endif %}
                                 </tr>
                             </thead>
@@ -273,13 +364,6 @@
                                             <td>
                                                 {% if event.gallons %}
                                                     {{ event.gallons }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if event.total_cost %}
-                                                    ${{ event.total_cost }}
                                                 {% else %}
                                                     -
                                                 {% endif %}
@@ -300,8 +384,8 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                {% if event.total_cost %}
-                                                    ${{ event.total_cost }}
+                                                {% if event.gallons %}
+                                                    {{ event.gallons }}
                                                 {% else %}
                                                     -
                                                 {% endif %}

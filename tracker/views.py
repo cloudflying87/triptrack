@@ -7,8 +7,8 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic.edit import FormView
 from django.contrib import messages
-from django.db.models import Sum, Count, Avg, F, Q
-from django.db.models.functions import TruncMonth
+from django.db.models import Sum, Count, Avg, F, Q, Max
+from django.db.models.functions import TruncMonth, TruncYear
 from datetime import datetime, timedelta
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse_lazy
@@ -957,20 +957,102 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             .annotate(
                 maintenance_cost=Sum('total_cost', filter=Q(event_type='maintenance')),
                 gas_cost=Sum('total_cost', filter=Q(event_type='gas')),
-                total_cost=Sum('total_cost')
+                total_cost=Sum('total_cost'),
+                max_miles=Max('miles'),
+                max_hours=Max('hours')
             )
             .order_by('-month')
         )
 
+        # Calculate yearly usage statistics
+        yearly_stats = (
+            events
+            .annotate(year=TruncYear('date'))
+            .values('year')
+            .annotate(
+                maintenance_cost=Sum('total_cost', filter=Q(event_type='maintenance')),
+                gas_cost=Sum('total_cost', filter=Q(event_type='gas')),
+                total_cost=Sum('total_cost'),
+                max_miles=Max('miles'),
+                max_hours=Max('hours')
+            )
+            .order_by('-year')
+        )
+
+        # Calculate usage per year (miles/hours driven per year)
+        yearly_usage = []
+        for i, year_stat in enumerate(yearly_stats):
+            if i < len(yearly_stats) - 1:
+                next_year_stat = yearly_stats[i + 1]
+                if vehicle.type == 'car' and year_stat['max_miles'] and next_year_stat['max_miles']:
+                    usage = year_stat['max_miles'] - next_year_stat['max_miles']
+                    yearly_usage.append({
+                        'year': year_stat['year'],
+                        'maintenance_cost': year_stat['maintenance_cost'],
+                        'gas_cost': year_stat['gas_cost'],
+                        'total_cost': year_stat['total_cost'],
+                        'usage': usage,
+                        'unit': 'miles'
+                    })
+                elif vehicle.type != 'car' and year_stat['max_hours'] and next_year_stat['max_hours']:
+                    usage = year_stat['max_hours'] - next_year_stat['max_hours']
+                    yearly_usage.append({
+                        'year': year_stat['year'],
+                        'maintenance_cost': year_stat['maintenance_cost'],
+                        'gas_cost': year_stat['gas_cost'],
+                        'total_cost': year_stat['total_cost'],
+                        'usage': usage,
+                        'unit': 'hours'
+                    })
+                else:
+                    yearly_usage.append({
+                        'year': year_stat['year'],
+                        'maintenance_cost': year_stat['maintenance_cost'],
+                        'gas_cost': year_stat['gas_cost'],
+                        'total_cost': year_stat['total_cost'],
+                        'usage': None,
+                        'unit': reading_label.lower()
+                    })
+            else:
+                yearly_usage.append({
+                    'year': year_stat['year'],
+                    'maintenance_cost': year_stat['maintenance_cost'],
+                    'gas_cost': year_stat['gas_cost'],
+                    'total_cost': year_stat['total_cost'],
+                    'usage': None,
+                    'unit': reading_label.lower()
+                })
+
         # Get last recorded mileage or hours
+        from datetime import date
+        year_start = date(date.today().year, 1, 1)
+
         if vehicle.type == 'car':
             last_reading_event = events.filter(miles__isnull=False).order_by('-date', '-miles').first()
             last_reading = last_reading_event.miles if last_reading_event else None
             reading_label = 'Miles'
+
+            # Get start of year reading
+            year_start_event = events.filter(
+                miles__isnull=False,
+                date__gte=year_start
+            ).order_by('date', 'miles').first()
+
+            year_start_reading = year_start_event.miles if year_start_event else None
+            ytd_usage = (last_reading - year_start_reading) if (last_reading and year_start_reading) else None
         else:
             last_reading_event = events.filter(hours__isnull=False).order_by('-date', '-hours').first()
             last_reading = last_reading_event.hours if last_reading_event else None
             reading_label = 'Hours'
+
+            # Get start of year reading
+            year_start_event = events.filter(
+                hours__isnull=False,
+                date__gte=year_start
+            ).order_by('date', 'hours').first()
+
+            year_start_reading = year_start_event.hours if year_start_event else None
+            ytd_usage = (last_reading - year_start_reading) if (last_reading and year_start_reading) else None
 
         context.update({
             'maintenance_events': maintenance_events,
@@ -982,8 +1064,11 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             'avg_mpg': avg_mpg,
             'mpg_data': mpg_data_json,  # Now a properly formatted JSON string
             'monthly_stats': monthly_stats,
+            'yearly_usage': yearly_usage,
             'last_reading': last_reading,
             'reading_label': reading_label,
+            'year_start_reading': year_start_reading,
+            'ytd_usage': ytd_usage,
             'start_date': start_date,
             'end_date': end_date,
         })
