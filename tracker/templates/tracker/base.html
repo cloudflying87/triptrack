@@ -7,13 +7,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TripTracker{% endblock %}</title>
-    
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'tracker/images/favicon.png' %}">
+
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#4285f4">
     <meta name="description" content="Track vehicle maintenance, gas, and outings">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="apple-touch-icon" href="{% static 'images/icon-192x192.png' %}">
-    
+    <link rel="apple-touch-icon" href="{% static 'tracker/images/favicon.png' %}">
+
+    <!-- Open Graph / Social Media Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}TripTracker{% endblock %}">
+    <meta property="og:description" content="Track vehicle maintenance, gas, and outings">
+    <meta property="og:image" content="{% static 'tracker/images/shareimage.png' %}">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}TripTracker{% endblock %}">
+    <meta name="twitter:description" content="Track vehicle maintenance, gas, and outings">
+    <meta name="twitter:image" content="{% static 'tracker/images/shareimage.png' %}">
+
     <!-- CSS -->
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">

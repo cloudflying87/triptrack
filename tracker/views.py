@@ -956,16 +956,47 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         
         # Group events by type (ordered by newest first)
         maintenance_events = events.filter(event_type='maintenance').order_by('-date')
-        gas_events = events.filter(event_type='gas').order_by('-date')
+        gas_events_raw = events.filter(event_type='gas').order_by('-date')
         outing_events = events.filter(event_type='outing').order_by('-date')
+
+        # Enrich gas events with hours/miles between fill-ups and consumption rates
+        gas_events = []
+        gas_events_list = list(gas_events_raw)
+        for i, event in enumerate(gas_events_list):
+            event_data = {
+                'event': event,
+                'hours_between': None,
+                'miles_between': None,
+                'gallons_per_hour': None
+            }
+
+            # Calculate miles between fill-ups (for cars)
+            if vehicle.type == 'car' and i < len(gas_events_list) - 1:
+                next_event = gas_events_list[i + 1]
+                if event.miles and next_event.miles:
+                    miles_between = event.miles - next_event.miles
+                    event_data['miles_between'] = miles_between
+
+            # Calculate hours between fill-ups (for non-car vehicles)
+            elif vehicle.type != 'car' and i < len(gas_events_list) - 1:
+                next_event = gas_events_list[i + 1]
+                if event.hours and next_event.hours:
+                    hours_between = event.hours - next_event.hours
+                    event_data['hours_between'] = hours_between
+
+                    # Calculate gallons per hour
+                    if event.gallons and hours_between > 0:
+                        event_data['gallons_per_hour'] = event.gallons / hours_between
+
+            gas_events.append(event_data)
         
         # Calculate statistics
         total_maintenance_cost = maintenance_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
-        total_gas_cost = gas_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
+        total_gas_cost = gas_events_raw.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
         
         # Calculate MPG
         mpg_data = []
-        for event in gas_events.order_by('date'):
+        for event in gas_events_raw.order_by('date'):
             mpg = event.get_mpg()
             if mpg:
                 mpg_data.append({
@@ -986,8 +1017,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         # Determine reading label based on vehicle type
         reading_label = 'Miles' if vehicle.type == 'car' else 'Hours'
 
-        # Calculate monthly usage statistics
-        monthly_stats = (
+        # Calculate monthly usage statistics with raw data
+        monthly_stats_raw = (
             events
             .annotate(month=TruncMonth('date'))
             .values('month')
@@ -1000,6 +1031,50 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
             )
             .order_by('-month')
         )
+
+        # Calculate actual usage per month (hours/miles used during that month)
+        monthly_stats = []
+        monthly_list = list(monthly_stats_raw)
+
+        for i, month_stat in enumerate(monthly_list):
+            if i < len(monthly_list) - 1:
+                next_month_stat = monthly_list[i + 1]
+
+                if vehicle.type == 'car' and month_stat['max_miles'] and next_month_stat['max_miles']:
+                    usage = month_stat['max_miles'] - next_month_stat['max_miles']
+                    monthly_stats.append({
+                        'month': month_stat['month'],
+                        'maintenance_cost': month_stat['maintenance_cost'],
+                        'gas_cost': month_stat['gas_cost'],
+                        'total_cost': month_stat['total_cost'],
+                        'usage': usage
+                    })
+                elif vehicle.type != 'car' and month_stat['max_hours'] and next_month_stat['max_hours']:
+                    usage = month_stat['max_hours'] - next_month_stat['max_hours']
+                    monthly_stats.append({
+                        'month': month_stat['month'],
+                        'maintenance_cost': month_stat['maintenance_cost'],
+                        'gas_cost': month_stat['gas_cost'],
+                        'total_cost': month_stat['total_cost'],
+                        'usage': usage
+                    })
+                else:
+                    monthly_stats.append({
+                        'month': month_stat['month'],
+                        'maintenance_cost': month_stat['maintenance_cost'],
+                        'gas_cost': month_stat['gas_cost'],
+                        'total_cost': month_stat['total_cost'],
+                        'usage': None
+                    })
+            else:
+                # First month (earliest) - can't calculate usage
+                monthly_stats.append({
+                    'month': month_stat['month'],
+                    'maintenance_cost': month_stat['maintenance_cost'],
+                    'gas_cost': month_stat['gas_cost'],
+                    'total_cost': month_stat['total_cost'],
+                    'usage': None
+                })
 
         # Calculate yearly usage statistics
         yearly_stats = (
@@ -1128,6 +1203,7 @@ class EventImportView(LoginRequiredMixin, View):
         import csv
         from io import TextIOWrapper
         from datetime import datetime
+        from decimal import Decimal
 
         if 'csv_file' not in request.FILES:
             messages.error(request, 'No file uploaded.')
@@ -1156,6 +1232,7 @@ class EventImportView(LoginRequiredMixin, View):
             csv_reader = csv.DictReader(decoded_file)
 
             imported_count = 0
+            skipped_count = 0
             errors = []
 
             for row_num, row in enumerate(csv_reader, start=2):
@@ -1183,7 +1260,7 @@ class EventImportView(LoginRequiredMixin, View):
                     hours = row.get('hours', '').strip()
                     miles = row.get('miles', '').strip()
 
-                    # Parse gallons
+                    # Parse gallons (use Decimal for precision)
                     gallons = row.get('gallons', '').strip()
 
                     # Get location
@@ -1204,16 +1281,28 @@ class EventImportView(LoginRequiredMixin, View):
                     if event_type not in ['outing', 'gas', 'maintenance']:
                         event_type = 'outing'
 
+                    # Check for duplicates (same vehicle, date, and event_type)
+                    existing_event = Event.objects.filter(
+                        vehicle=vehicle,
+                        date=date_obj,
+                        event_type=event_type
+                    ).first()
+
+                    if existing_event:
+                        skipped_count += 1
+                        continue
+
                     # Create event
                     event = Event.objects.create(
                         vehicle=vehicle,
                         event_type=event_type,
                         date=date_obj,
-                        hours=float(hours) if hours else None,
+                        hours=Decimal(hours) if hours else None,
                         miles=float(miles) if miles else None,
-                        gallons=float(gallons) if gallons else None,
+                        gallons=Decimal(gallons) if gallons else None,
                         location=location,
-                        notes=notes
+                        notes=notes,
+                        created_by=request.user
                     )
                     imported_count += 1
 
@@ -1222,6 +1311,9 @@ class EventImportView(LoginRequiredMixin, View):
 
             if imported_count > 0:
                 messages.success(request, f'Successfully imported {imported_count} events.')
+
+            if skipped_count > 0:
+                messages.info(request, f'Skipped {skipped_count} duplicate events.')
 
             if errors:
                 for error in errors[:10]:  # Show first 10 errors
