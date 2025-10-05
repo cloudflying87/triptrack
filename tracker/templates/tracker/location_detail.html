@@ -49,11 +49,125 @@
     </div>
 </div>
 
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Visit Statistics</h5>
+            </div>
+            <div class="card-body text-center">
+                <h2 class="display-4">{{ total_visits }}</h2>
+                <p class="text-muted">Total Visits</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Vehicles</h5>
+            </div>
+            <div class="card-body">
+                {% if vehicles_visited %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Vehicle</th>
+                                <th>Visits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vehicle in vehicles_visited %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'vehicle_detail' vehicle.vehicle__id %}">
+                                        {{ vehicle.vehicle__name }}
+                                    </a>
+                                </td>
+                                <td>{{ vehicle.visit_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No vehicles have visited this location yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if yearly_visits %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Yearly Visit History</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Visits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in yearly_visits %}
+                            <tr>
+                                <td><strong>{{ stat.year|date:"Y" }}</strong></td>
+                                <td>{{ stat.visit_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if monthly_visits %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Monthly Visit Breakdown</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Visits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in monthly_visits %}
+                            <tr>
+                                <td><strong>{{ stat.month|date:"F Y" }}</strong></td>
+                                <td>{{ stat.visit_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Events at this Location</h5>
+                <h5 class="mb-0">Recent Events at this Location (Last 20)</h5>
             </div>
             <div class="card-body">
                 {% if events %}

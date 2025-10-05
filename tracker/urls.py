@@ -30,6 +30,7 @@ urlpatterns = [
     # Event URLs
     path('events/', views.EventListView.as_view(), name='event_list'),
     path('events/create/', views.EventCreateView.as_view(), name='event_create'),
+    path('events/import/', views.EventImportView.as_view(), name='event_import'),
     path('events/maintenance/create/', views.MaintenanceCreateView.as_view(), name='maintenance_create'),
     path('events/gas/create/', views.GasCreateView.as_view(), name='gas_create'),
     path('events/outing/create/', views.OutingCreateView.as_view(), name='outing_create'),

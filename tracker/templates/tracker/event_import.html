@@ -1,0 +1,97 @@
+<!-- tracker/templates/tracker/event_import.html -->
+{% extends 'tracker/base.html' %}
+
+{% block title %}TripTracker - Import Events{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-8 mx-auto">
+    <div class="card form-card">
+      <div class="card-header">
+        <h2 class="card-title">Import Events from CSV</h2>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info">
+          <h5><i class="bi bi-info-circle"></i> CSV Format Instructions</h5>
+          <p>Your CSV file should have the following columns:</p>
+          <ul>
+            <li><strong>date</strong> (required) - Format: MM/DD/YY or MM/DD/YYYY or YYYY-MM-DD</li>
+            <li><strong>event_type</strong> (optional) - Type of event: outing, gas, or maintenance (defaults to outing)</li>
+            <li><strong>hours</strong> (optional) - Engine hours reading</li>
+            <li><strong>miles</strong> (optional) - Odometer reading</li>
+            <li><strong>gallons</strong> (optional) - Fuel amount</li>
+            <li><strong>location</strong> (optional) - Location name</li>
+            <li><strong>notes</strong> (optional) - Any notes about the event</li>
+          </ul>
+          <p class="mb-0"><strong>Example:</strong></p>
+          <code>date,event_type,hours,gallons,location,notes<br>
+4/13/24,outing,912.0,,Marion,Rena and Theo - combined temp 102<br>
+5/1/24,gas,912.9,10,Marion,Rena - wind 260@11G20</code>
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="vehicle" class="form-label">Vehicle *</label>
+            <select name="vehicle" id="vehicle" class="form-select" required>
+              <option value="">Select a vehicle...</option>
+              {% for vehicle in vehicles %}
+                <option value="{{ vehicle.id }}">{{ vehicle.name }} ({{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">All events will be imported for this vehicle</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="csv_file" class="form-label">CSV File *</label>
+            <input type="file" name="csv_file" id="csv_file" class="form-control" accept=".csv" required>
+            <div class="form-text">Upload a CSV file with your event data</div>
+          </div>
+
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload"></i> Import Events
+            </button>
+            <a href="{% url 'event_list' %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-4">
+      <div class="card-header">
+        <h5 class="mb-0">Sample CSV Template</h5>
+      </div>
+      <div class="card-body">
+        <p>Download this sample CSV file and edit it with your data:</p>
+        <textarea class="form-control font-monospace" rows="6" readonly>date,event_type,hours,gallons,location,notes
+4/13/24,outing,912.0,,Marion,"Rena, Theo - combined temp 102, 49 water 52 air"
+5/1/24,gas,912.9,10,Marion,"Rena - wind 260@11G20"
+5/3/24,outing,,,Marion,"Thea and Rena - wetsuits"
+5/8/24,gas,917.0,26,Marion,"Thea, Rena, Norah - ran out of gas"</textarea>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyTemplate()">
+          <i class="bi bi-clipboard"></i> Copy Template
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyTemplate() {
+  const textarea = document.querySelector('textarea');
+  textarea.select();
+  document.execCommand('copy');
+
+  const btn = event.target.closest('button');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+  setTimeout(() => {
+    btn.innerHTML = originalText;
+  }, 2000);
+}
+</script>
+{% endblock %}

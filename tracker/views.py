@@ -770,10 +770,44 @@ class LocationDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        location = self.object
+
         # Get all events at this location
-        context['events'] = Event.objects.filter(
-            location=self.object
-        ).order_by('-date')[:20]  # Show last 20 events
+        all_events = Event.objects.filter(location=location)
+        context['events'] = all_events.order_by('-date')[:20]  # Show last 20 events
+
+        # Total visits
+        context['total_visits'] = all_events.count()
+
+        # Visits by year
+        yearly_visits = (
+            all_events
+            .annotate(year=TruncYear('date'))
+            .values('year')
+            .annotate(visit_count=Count('id'))
+            .order_by('-year')
+        )
+        context['yearly_visits'] = yearly_visits
+
+        # Visits by month
+        monthly_visits = (
+            all_events
+            .annotate(month=TruncMonth('date'))
+            .values('month')
+            .annotate(visit_count=Count('id'))
+            .order_by('-month')
+        )
+        context['monthly_visits'] = monthly_visits
+
+        # Vehicles that have visited this location
+        vehicles_visited = (
+            all_events
+            .values('vehicle__id', 'vehicle__name', 'vehicle__make', 'vehicle__model')
+            .annotate(visit_count=Count('id'))
+            .order_by('-visit_count')
+        )
+        context['vehicles_visited'] = vehicles_visited
+
         return context
 
 class LocationCreateView(LoginRequiredMixin, CreateView):
@@ -1079,6 +1113,127 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         vehicle = self.get_object()
         # Check if user is in the family that owns the vehicle
         return self.request.user.families.filter(id=vehicle.family.id).exists()
+
+class EventImportView(LoginRequiredMixin, View):
+    template_name = 'tracker/event_import.html'
+
+    def get(self, request):
+        # Get all vehicles in families the user belongs to
+        user_families = request.user.families.all()
+        vehicles = Vehicle.objects.filter(family__in=user_families)
+
+        return render(request, self.template_name, {'vehicles': vehicles})
+
+    def post(self, request):
+        import csv
+        from io import TextIOWrapper
+        from datetime import datetime
+
+        if 'csv_file' not in request.FILES:
+            messages.error(request, 'No file uploaded.')
+            return redirect('event_import')
+
+        csv_file = request.FILES['csv_file']
+        vehicle_id = request.POST.get('vehicle')
+
+        if not vehicle_id:
+            messages.error(request, 'Please select a vehicle.')
+            return redirect('event_import')
+
+        try:
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+            # Check if user has access to this vehicle
+            if not request.user.families.filter(id=vehicle.family.id).exists():
+                messages.error(request, 'You do not have access to this vehicle.')
+                return redirect('event_import')
+        except Vehicle.DoesNotExist:
+            messages.error(request, 'Vehicle not found.')
+            return redirect('event_import')
+
+        try:
+            # Read CSV file
+            decoded_file = TextIOWrapper(csv_file.file, encoding='utf-8')
+            csv_reader = csv.DictReader(decoded_file)
+
+            imported_count = 0
+            errors = []
+
+            for row_num, row in enumerate(csv_reader, start=2):
+                try:
+                    # Parse date
+                    date_str = row.get('date', '').strip()
+                    if not date_str:
+                        errors.append(f"Row {row_num}: Missing date")
+                        continue
+
+                    # Try multiple date formats
+                    date_obj = None
+                    for date_format in ['%m/%d/%y', '%m/%d/%Y', '%Y-%m-%d']:
+                        try:
+                            date_obj = datetime.strptime(date_str, date_format).date()
+                            break
+                        except ValueError:
+                            continue
+
+                    if not date_obj:
+                        errors.append(f"Row {row_num}: Invalid date format '{date_str}'")
+                        continue
+
+                    # Parse hours/miles
+                    hours = row.get('hours', '').strip()
+                    miles = row.get('miles', '').strip()
+
+                    # Parse gallons
+                    gallons = row.get('gallons', '').strip()
+
+                    # Get location
+                    location_name = row.get('location', '').strip()
+                    location = None
+                    if location_name:
+                        location, _ = Location.objects.get_or_create(
+                            name=location_name,
+                            family=vehicle.family,
+                            defaults={'created_by': request.user}
+                        )
+
+                    # Get notes
+                    notes = row.get('notes', '').strip()
+
+                    # Get event type (default to 'outing')
+                    event_type = row.get('event_type', 'outing').strip().lower()
+                    if event_type not in ['outing', 'gas', 'maintenance']:
+                        event_type = 'outing'
+
+                    # Create event
+                    event = Event.objects.create(
+                        vehicle=vehicle,
+                        event_type=event_type,
+                        date=date_obj,
+                        hours=float(hours) if hours else None,
+                        miles=float(miles) if miles else None,
+                        gallons=float(gallons) if gallons else None,
+                        location=location,
+                        notes=notes
+                    )
+                    imported_count += 1
+
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+
+            if imported_count > 0:
+                messages.success(request, f'Successfully imported {imported_count} events.')
+
+            if errors:
+                for error in errors[:10]:  # Show first 10 errors
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... and {len(errors) - 10} more errors')
+
+            return redirect('event_list')
+
+        except Exception as e:
+            messages.error(request, f'Error processing file: {str(e)}')
+            return redirect('event_import')
 
 class MaintenanceScheduleListView(LoginRequiredMixin, ListView):
     model = MaintenanceSchedule
