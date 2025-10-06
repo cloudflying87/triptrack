@@ -933,7 +933,7 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class VehicleReportView(LoginRequiredMixin, DetailView):
+class VehicleReportView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Vehicle
     template_name = 'tracker/vehicle_report.html'
     context_object_name = 'vehicle'
@@ -1027,7 +1027,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                 gas_cost=Sum('total_cost', filter=Q(event_type='gas')),
                 total_cost=Sum('total_cost'),
                 max_miles=Max('miles'),
-                max_hours=Max('hours')
+                max_hours=Max('hours'),
+                outing_count=Count('id', filter=Q(event_type='outing'))
             )
             .order_by('-month')
         )
@@ -1047,7 +1048,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'maintenance_cost': month_stat['maintenance_cost'],
                         'gas_cost': month_stat['gas_cost'],
                         'total_cost': month_stat['total_cost'],
-                        'usage': usage
+                        'usage': usage,
+                        'outing_count': month_stat['outing_count']
                     })
                 elif vehicle.type != 'car' and month_stat['max_hours'] and next_month_stat['max_hours']:
                     usage = month_stat['max_hours'] - next_month_stat['max_hours']
@@ -1056,7 +1058,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'maintenance_cost': month_stat['maintenance_cost'],
                         'gas_cost': month_stat['gas_cost'],
                         'total_cost': month_stat['total_cost'],
-                        'usage': usage
+                        'usage': usage,
+                        'outing_count': month_stat['outing_count']
                     })
                 else:
                     monthly_stats.append({
@@ -1064,7 +1067,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'maintenance_cost': month_stat['maintenance_cost'],
                         'gas_cost': month_stat['gas_cost'],
                         'total_cost': month_stat['total_cost'],
-                        'usage': None
+                        'usage': None,
+                        'outing_count': month_stat['outing_count']
                     })
             else:
                 # First month (earliest) - can't calculate usage
@@ -1073,7 +1077,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                     'maintenance_cost': month_stat['maintenance_cost'],
                     'gas_cost': month_stat['gas_cost'],
                     'total_cost': month_stat['total_cost'],
-                    'usage': None
+                    'usage': None,
+                    'outing_count': month_stat['outing_count']
                 })
 
         # Calculate yearly usage statistics
@@ -1086,7 +1091,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                 gas_cost=Sum('total_cost', filter=Q(event_type='gas')),
                 total_cost=Sum('total_cost'),
                 max_miles=Max('miles'),
-                max_hours=Max('hours')
+                max_hours=Max('hours'),
+                outing_count=Count('id', filter=Q(event_type='outing'))
             )
             .order_by('-year')
         )
@@ -1104,7 +1110,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'gas_cost': year_stat['gas_cost'],
                         'total_cost': year_stat['total_cost'],
                         'usage': usage,
-                        'unit': 'miles'
+                        'unit': 'miles',
+                        'outing_count': year_stat['outing_count']
                     })
                 elif vehicle.type != 'car' and year_stat['max_hours'] and next_year_stat['max_hours']:
                     usage = year_stat['max_hours'] - next_year_stat['max_hours']
@@ -1114,7 +1121,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'gas_cost': year_stat['gas_cost'],
                         'total_cost': year_stat['total_cost'],
                         'usage': usage,
-                        'unit': 'hours'
+                        'unit': 'hours',
+                        'outing_count': year_stat['outing_count']
                     })
                 else:
                     yearly_usage.append({
@@ -1123,7 +1131,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                         'gas_cost': year_stat['gas_cost'],
                         'total_cost': year_stat['total_cost'],
                         'usage': None,
-                        'unit': reading_label.lower()
+                        'unit': reading_label.lower(),
+                        'outing_count': year_stat['outing_count']
                     })
             else:
                 yearly_usage.append({
@@ -1132,7 +1141,8 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
                     'gas_cost': year_stat['gas_cost'],
                     'total_cost': year_stat['total_cost'],
                     'usage': None,
-                    'unit': reading_label.lower()
+                    'unit': reading_label.lower(),
+                    'outing_count': year_stat['outing_count']
                 })
 
         # Get last recorded mileage or hours
@@ -1184,6 +1194,100 @@ class VehicleReportView(LoginRequiredMixin, DetailView):
         })
         return context
     
+    def test_func(self):
+        vehicle = self.get_object()
+        # Check if user is in the family that owns the vehicle
+        return self.request.user.families.filter(id=vehicle.family.id).exists()
+
+class VehicleUsageAnalyticsView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    model = Vehicle
+    template_name = 'tracker/vehicle_usage_analytics.html'
+    context_object_name = 'vehicle'
+
+    def get_context_data(self, **kwargs):
+        import json
+        from datetime import datetime
+        context = super().get_context_data(**kwargs)
+        vehicle = self.get_object()
+
+        # Get filters from request
+        selected_year = self.request.GET.get('year')
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+
+        # Get all events for this vehicle
+        events = Event.objects.filter(vehicle=vehicle)
+
+        # Get available years for the dropdown
+        available_years = list(set([date.year for date in Event.objects.filter(vehicle=vehicle).dates('date', 'year')]))
+        available_years.sort(reverse=True)
+
+        # Apply filters
+        if start_date and end_date:
+            # Custom date range takes priority
+            events = events.filter(date__gte=start_date, date__lte=end_date)
+            all_outings = events.filter(event_type='outing').order_by('-date')
+        elif selected_year and selected_year != 'all':
+            # Filter by specific year
+            events = events.filter(date__year=selected_year)
+            all_outings = events.filter(event_type='outing').order_by('-date')
+        elif selected_year == 'all':
+            # Show all time - no year filter
+            all_outings = events.filter(event_type='outing').order_by('-date')
+        else:
+            # Default to most recent year with data
+            if available_years:
+                selected_year = str(available_years[0])
+                events = events.filter(date__year=selected_year)
+            all_outings = events.filter(event_type='outing').order_by('-date')
+
+        # Calculate monthly usage statistics (hours/miles used per month)
+        monthly_stats_raw = (
+            events
+            .annotate(month=TruncMonth('date'))
+            .values('month')
+            .annotate(
+                max_miles=Max('miles'),
+                max_hours=Max('hours'),
+                outing_count=Count('id', filter=Q(event_type='outing'))
+            )
+            .order_by('month')
+        )
+
+        # Calculate actual usage per month
+        monthly_data = []
+        monthly_list = list(monthly_stats_raw)
+
+        for i, month_stat in enumerate(monthly_list):
+            if i > 0:  # Start from second month to calculate difference
+                prev_month_stat = monthly_list[i - 1]
+
+                month_label = month_stat['month'].strftime('%Y-%m')
+                outing_count = month_stat['outing_count']
+                usage = None
+
+                if vehicle.type == 'car' and month_stat['max_miles'] and prev_month_stat['max_miles']:
+                    usage = month_stat['max_miles'] - prev_month_stat['max_miles']
+                elif vehicle.type != 'car' and month_stat['max_hours'] and prev_month_stat['max_hours']:
+                    usage = float(month_stat['max_hours'] - prev_month_stat['max_hours'])
+
+                monthly_data.append({
+                    'month': month_label,
+                    'usage': usage if usage else 0,
+                    'outings': outing_count
+                })
+
+        context.update({
+            'monthly_data': json.dumps(monthly_data),
+            'all_outings': all_outings,
+            'reading_label': 'Miles' if vehicle.type == 'car' else 'Hours',
+            'available_years': available_years,
+            'selected_year': selected_year,
+            'start_date': start_date,
+            'end_date': end_date,
+        })
+        return context
+
     def test_func(self):
         vehicle = self.get_object()
         # Check if user is in the family that owns the vehicle

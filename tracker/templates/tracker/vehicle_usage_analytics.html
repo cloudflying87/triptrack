@@ -1,0 +1,315 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<style>
+    .chart-container {
+        position: relative;
+        height: 500px;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Usage Analytics - {{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</h2>
+                <a href="{% url 'vehicle_report' vehicle.pk %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Report
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="year" class="form-label">Filter by Year</label>
+                    <select name="year" id="year" class="form-select">
+                        <option value="all" {% if selected_year == "all" %}selected{% endif %}>All Time</option>
+                        {% for year in available_years %}
+                            <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end justify-content-center">
+                    <span class="text-muted">OR</span>
+                </div>
+                <div class="col-md-5">
+                    <label for="daterange" class="form-label">Custom Date Range</label>
+                    <input type="text" id="daterange" name="daterange" class="form-control"
+                           value="{% if start_date %}{{ start_date }} - {{ end_date }}{% endif %}"
+                           placeholder="Select custom date range">
+                    <input type="hidden" id="start_date" name="start_date" value="{{ start_date }}">
+                    <input type="hidden" id="end_date" name="end_date" value="{{ end_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">Apply</button>
+                    <a href="{% url 'vehicle_usage_analytics' vehicle.pk %}" class="btn btn-outline-secondary">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Combined Usage and Outings Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Monthly {{ reading_label }} and Outings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="combinedChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Outings Table -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">All Outings <span class="badge bg-info">{{ all_outings|length }}</span></h5>
+                </div>
+                <div class="card-body">
+                    {% if all_outings %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Location</th>
+                                        <th>Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in all_outings %}
+                                        <tr>
+                                            <td>{{ event.date|date:"M d, Y" }}</td>
+                                            <td>{{ event.location|default:"-" }}</td>
+                                            <td>
+                                                {% if event.notes %}
+                                                    {{ event.notes|truncatechars:30 }}
+                                                    {% if event.notes|length > 30 %}
+                                                        <button type="button" class="btn btn-sm btn-link p-0" data-bs-toggle="modal" data-bs-target="#notesModal{{ event.pk }}">
+                                                            <i class="bi bi-three-dots"></i> View Full
+                                                        </button>
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'event_update' event.pk %}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i> Edit
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-center">No outing records found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notes Modals -->
+{% for event in all_outings %}
+    {% if event.notes %}
+        <div class="modal fade" id="notesModal{{ event.pk }}" tabindex="-1" aria-labelledby="notesModalLabel{{ event.pk }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="notesModalLabel{{ event.pk }}">Notes - {{ event.date|date:"M d, Y" }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Location:</strong> {{ event.location|default:"-" }}</p>
+                        <hr>
+                        <p class="mb-0">{{ event.notes|linebreaks }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <a href="{% url 'event_update' event.pk %}" class="btn btn-primary">
+                            <i class="bi bi-pencil"></i> Edit Event
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/moment/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Parse data from Django
+        const monthlyData = JSON.parse('{{ monthly_data|escapejs }}');
+
+        // Combined Chart with dual y-axes
+        const combinedCtx = document.getElementById('combinedChart').getContext('2d');
+        new Chart(combinedCtx, {
+            type: 'bar',
+            data: {
+                labels: monthlyData.map(item => item.month),
+                datasets: [
+                    {
+                        label: '{{ reading_label }} per Month',
+                        data: monthlyData.map(item => item.usage),
+                        backgroundColor: 'rgba(66, 133, 244, 0.6)',
+                        borderColor: '#4285f4',
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        label: 'Outings per Month',
+                        data: monthlyData.map(item => item.outings),
+                        type: 'line',
+                        borderColor: '#34a853',
+                        backgroundColor: 'rgba(52, 168, 83, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.1,
+                        fill: false,
+                        yAxisID: 'y1',
+                        order: 1,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '{{ reading_label }} per Month',
+                            color: '#4285f4',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            color: '#4285f4'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Outings',
+                            color: '#34a853',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            stepSize: 1,
+                            color: '#34a853'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Date Range Picker
+        if (typeof $ !== 'undefined' && typeof moment !== 'undefined') {
+            $('#daterange').daterangepicker({
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear',
+                    format: 'MM/DD/YYYY'
+                }
+            });
+
+            $('#daterange').on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+                $('#start_date').val(picker.startDate.format('YYYY-MM-DD'));
+                $('#end_date').val(picker.endDate.format('YYYY-MM-DD'));
+            });
+
+            $('#daterange').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+                $('#start_date').val('');
+                $('#end_date').val('');
+            });
+        }
+
+        // Clear year when date range is selected
+        $('#daterange').on('apply.daterangepicker', function() {
+            $('#year').val('');
+        });
+
+        // Clear date range when year is selected
+        $('#year').on('change', function() {
+            if ($(this).val()) {
+                $('#daterange').val('');
+                $('#start_date').val('');
+                $('#end_date').val('');
+            }
+        });
+    });
+</script>
+{% endblock %}

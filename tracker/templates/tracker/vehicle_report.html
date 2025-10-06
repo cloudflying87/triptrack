@@ -11,7 +11,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>{{ vehicle.name }} Report</h1>
-    <!--  -->
+    <a href="{% url 'vehicle_usage_analytics' vehicle.pk %}" class="btn btn-info">
+        <i class="bi bi-graph-up"></i> Usage Analytics
+    </a>
 </div>
 
 <div class="card mb-4">
@@ -144,6 +146,7 @@
                             <tr>
                                 <th>Year</th>
                                 <th>Usage ({{ reading_label }})</th>
+                                <th>Outings</th>
                                 <th>Maintenance Cost</th>
                                 <th>Fuel Cost</th>
                                 <th>Total Cost</th>
@@ -159,6 +162,9 @@
                                         {% else %}
                                             -
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ stat.outing_count|default:"0" }}
                                     </td>
                                     <td>
                                         {% if stat.maintenance_cost %}
@@ -208,6 +214,7 @@
                             <tr>
                                 <th>Month</th>
                                 <th>{{ reading_label }}</th>
+                                <th>Outings</th>
                                 <th>Maintenance Cost</th>
                                 <th>Fuel Cost</th>
                                 <th>Total Cost</th>
@@ -223,6 +230,9 @@
                                         {% else %}
                                             -
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ stat.outing_count|default:"0" }}
                                     </td>
                                     <td>
                                         {% if stat.maintenance_cost %}
@@ -476,7 +486,16 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {{ event.notes|truncatechars:50|default:"-" }}
+                                            {% if event.notes %}
+                                                {{ event.notes|truncatechars:30 }}
+                                                {% if event.notes|length > 30 %}
+                                                    <button type="button" class="btn btn-sm btn-link p-0" data-bs-toggle="modal" data-bs-target="#notesModal{{ event.pk }}">
+                                                        <i class="bi bi-three-dots"></i> View Full
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                -
+                                            {% endif %}
                                         </td>
                                         <td>
                                             <a href="{% url 'event_update' event.pk %}" class="btn btn-sm btn-outline-primary">
@@ -495,6 +514,33 @@
         </div>
     </div>
 </div>
+
+<!-- Notes Modals for Outings -->
+{% for event in outing_events %}
+    {% if event.notes %}
+        <div class="modal fade" id="notesModal{{ event.pk }}" tabindex="-1" aria-labelledby="notesModalLabel{{ event.pk }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="notesModalLabel{{ event.pk }}">Notes - {{ event.date|date:"M d, Y" }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Location:</strong> {{ event.location|default:"-" }}</p>
+                        <hr>
+                        <p class="mb-0">{{ event.notes|linebreaks }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <a href="{% url 'event_update' event.pk %}" class="btn btn-primary">
+                            <i class="bi bi-pencil"></i> Edit Event
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}
 {% endblock %}
 
 {% block extra_js %}

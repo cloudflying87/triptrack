@@ -56,6 +56,7 @@ urlpatterns = [
     # Reports
     path('reports/', views.ReportsView.as_view(), name='reports'),
     path('reports/vehicle/<int:pk>/', views.VehicleReportView.as_view(), name='vehicle_report'),
+    path('reports/vehicle/<int:pk>/analytics/', views.VehicleUsageAnalyticsView.as_view(), name='vehicle_usage_analytics'),
     
     # Maintenance Schedules
     path('maintenance-schedules/', views.MaintenanceScheduleListView.as_view(), name='maintenance_schedule_list'),
