@@ -26,7 +26,13 @@ class Vehicle(models.Model):
         ('boat', 'Boat (hours)'),
         ('other', 'Other'),
     ]
-    
+
+    BOAT_ENGINE_CHOICES = [
+        ('inboard', 'Inboard'),
+        ('outboard', 'Outboard'),
+        ('io', 'Inboard/Outboard (I/O)'),
+    ]
+
     # Changed from owner to family
     family = models.ForeignKey(Family, on_delete=models.CASCADE, related_name='vehicles')
     name = models.CharField(max_length=100)
@@ -38,6 +44,8 @@ class Vehicle(models.Model):
     starting_mileage = models.PositiveIntegerField(null=True, blank=True)
     model = models.CharField(max_length=100)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='car')
+    boat_engine_type = models.CharField(max_length=20, choices=BOAT_ENGINE_CHOICES, null=True, blank=True,
+                                        help_text="Engine type for boats")
     image = ProcessedImageField(
         upload_to='vehicle_images/',
         processors=[ResizeToFill(800, 600)],
@@ -87,18 +95,45 @@ class MaintenanceCategory(models.Model):
         ('other', 'Other'),
         ('all', 'All Vehicle Types'),
     ]
-    
+
+    BOAT_ENGINE_TYPE_CHOICES = [
+        ('inboard', 'Inboard'),
+        ('outboard', 'Outboard'),
+        ('io', 'Inboard/Outboard (I/O)'),
+        ('all', 'All Boat Engine Types'),
+    ]
+
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     vehicle_types = models.JSONField(default=list, help_text="List of vehicle types this category applies to")
-    
+    boat_engine_types = models.JSONField(default=list, blank=True,
+                                         help_text="List of boat engine types this category applies to (only for boat maintenance)")
+
     def __str__(self):
         return self.name
-    
+
     def applies_to_vehicle_type(self, vehicle_type):
         """Check if this category applies to the given vehicle type"""
         return 'all' in self.vehicle_types or vehicle_type in self.vehicle_types
-    
+
+    def applies_to_boat_engine_type(self, boat_engine_type):
+        """Check if this category applies to the given boat engine type"""
+        if not self.boat_engine_types:
+            return True  # If no engine types specified, applies to all
+        return 'all' in self.boat_engine_types or boat_engine_type in self.boat_engine_types
+
+    def applies_to_vehicle(self, vehicle):
+        """Check if this category applies to the given vehicle"""
+        # First check vehicle type
+        if not self.applies_to_vehicle_type(vehicle.type):
+            return False
+
+        # If it's a boat, also check engine type
+        if vehicle.type == 'boat' and vehicle.boat_engine_type:
+            return self.applies_to_boat_engine_type(vehicle.boat_engine_type)
+
+        return True
+
     class Meta:
         verbose_name_plural = "Maintenance Categories"
 
@@ -253,6 +288,25 @@ class Event(models.Model):
             models.Index(fields=['vehicle', 'date']),
             models.Index(fields=['event_type']),
             models.Index(fields=['created_by', 'date']),  # Changed from user to created_by
+        ]
+
+
+class MaintenanceItem(models.Model):
+    """Model for individual maintenance items performed during a maintenance event"""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='maintenance_items',
+                             limit_choices_to={'event_type': 'maintenance'})
+    maintenance_category = models.ForeignKey(MaintenanceCategory, on_delete=models.CASCADE)
+    description = models.TextField(blank=True, null=True, help_text="Additional details about this specific item")
+    cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.maintenance_category.name} - {self.event.date}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['event', 'maintenance_category']),
+            models.Index(fields=['maintenance_category']),
         ]
 
 

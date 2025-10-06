@@ -65,15 +65,21 @@
                 {% if due_maintenance %}
                     <div class="list-group">
                         {% for maintenance in due_maintenance %}
-                            <div class="list-group-item">
+                            <div class="list-group-item list-group-item-action" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#maintenanceModal{{ maintenance.pk }}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">{{ maintenance.name }}</h6>
                                     <span class="badge bg-danger">Due</span>
                                 </div>
-                                <p class="mb-0">{{ maintenance.vehicle.name }}</p>
+                                <p class="mb-1"><strong>Vehicle:</strong> {{ maintenance.vehicle.name }}</p>
+                                <p class="mb-1"><strong>Type:</strong> {{ maintenance.maintenance_type.name }}</p>
                                 <small class="text-muted">
                                     {% if maintenance.last_performed %}
                                         Last performed: {{ maintenance.last_performed|date:"M d, Y" }}
+                                        {% if maintenance.vehicle.type == 'car' and maintenance.last_miles %}
+                                            at {{ maintenance.last_miles|floatformat:0 }} miles
+                                        {% elif maintenance.vehicle.type != 'car' and maintenance.last_hours %}
+                                            at {{ maintenance.last_hours|floatformat:1 }} hours
+                                        {% endif %}
                                     {% else %}
                                         Never performed
                                     {% endif %}
@@ -88,4 +94,77 @@
         </div>
     </div>
 </div>
+
+<!-- Maintenance Detail Modals -->
+{% for maintenance in due_maintenance %}
+    <div class="modal fade" id="maintenanceModal{{ maintenance.pk }}" tabindex="-1" aria-labelledby="maintenanceModalLabel{{ maintenance.pk }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="maintenanceModalLabel{{ maintenance.pk }}">{{ maintenance.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Vehicle:</strong> {{ maintenance.vehicle.name }}</p>
+                    <p><strong>Maintenance Type:</strong> {{ maintenance.maintenance_type.name }}</p>
+
+                    {% if maintenance.description %}
+                        <p><strong>Description:</strong> {{ maintenance.description }}</p>
+                    {% endif %}
+
+                    <hr>
+
+                    <h6>Schedule Details:</h6>
+                    <ul>
+                        {% if maintenance.interval_miles %}
+                            <li>Every {{ maintenance.interval_miles|floatformat:0 }} miles</li>
+                        {% endif %}
+                        {% if maintenance.interval_hours %}
+                            <li>Every {{ maintenance.interval_hours|floatformat:0 }} hours</li>
+                        {% endif %}
+                        {% if maintenance.interval_days %}
+                            <li>Every {{ maintenance.interval_days }} days</li>
+                        {% endif %}
+                    </ul>
+
+                    <hr>
+
+                    <h6>Last Service:</h6>
+                    {% if maintenance.last_performed %}
+                        <p>
+                            Date: {{ maintenance.last_performed|date:"M d, Y" }}<br>
+                            {% if maintenance.vehicle.type == 'car' and maintenance.last_miles %}
+                                Odometer: {{ maintenance.last_miles|floatformat:0 }} miles
+                            {% elif maintenance.vehicle.type != 'car' and maintenance.last_hours %}
+                                Hour meter: {{ maintenance.last_hours|floatformat:1 }} hours
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="text-muted">No service history</p>
+                    {% endif %}
+
+                    <hr>
+
+                    <h6>Current Status:</h6>
+                    <p>
+                        {% if maintenance.vehicle.type == 'car' %}
+                            Current odometer: {{ maintenance.vehicle.get_latest_miles_or_hours|floatformat:0 }} miles
+                        {% else %}
+                            Current hour meter: {{ maintenance.vehicle.get_latest_miles_or_hours|floatformat:1 }} hours
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="{% url 'maintenance_schedule_update' maintenance.pk %}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit Schedule
+                    </a>
+                    <a href="{% url 'maintenance_create' %}?vehicle={{ maintenance.vehicle.pk }}&schedule={{ maintenance.pk }}" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Mark as Done
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
 {% endblock %}

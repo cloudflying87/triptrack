@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from datetime import date
 from django.utils.translation import gettext_lazy as _
-from .models import Family, Vehicle, Event, TodoItem, Location, MaintenanceSchedule
+from .models import Family, Vehicle, Event, TodoItem, Location, MaintenanceSchedule, MaintenanceItem
 
 
 class VehicleTypeFieldMixin:
@@ -93,7 +93,7 @@ class VehicleForm(forms.ModelForm):
     class Meta:
         model = Vehicle
         fields = [
-            'name', 'make', 'model', 'year', 'type', 
+            'name', 'make', 'model', 'year', 'type', 'boat_engine_type',
             'starting_mileage', 'vin', 'license_plate',
             'image', 'family'
         ]
@@ -105,7 +105,8 @@ class VehicleForm(forms.ModelForm):
             'starting_mileage': forms.NumberInput(attrs={'class': 'form-control'}),
             'vin': forms.TextInput(attrs={'class': 'form-control'}),
             'license_plate': forms.TextInput(attrs={'class': 'form-control'}),
-            'type': forms.Select(attrs={'class': 'form-select'}),
+            'type': forms.Select(attrs={'class': 'form-select', 'id': 'id_type'}),
+            'boat_engine_type': forms.Select(attrs={'class': 'form-select', 'id': 'id_boat_engine_type'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'family': forms.Select(attrs={'class': 'form-select'}),
         }
@@ -119,11 +120,17 @@ class VehicleForm(forms.ModelForm):
             # If user is only in one family, preselect it
             if user.families.count() == 1:
                 self.fields['family'].initial = user.families.first()
-        
+
         # Add help text for fields
-        self.fields['starting_mileage'].help_text = "Initial odometer reading"
+        self.fields['starting_mileage'].help_text = "Initial odometer reading (miles for cars, hours for boats)"
         self.fields['vin'].help_text = "Vehicle Identification Number"
         self.fields['license_plate'].help_text = "Registration plate number"
+        self.fields['boat_engine_type'].help_text = "Engine type (only for boats)"
+
+        # Hide boat_engine_type by default if not a boat
+        if self.instance and self.instance.pk:
+            if self.instance.type != 'boat':
+                self.fields['boat_engine_type'].widget.attrs.update({'style': 'display: none;'})
 
 
 class EventForm(forms.ModelForm):
@@ -222,41 +229,31 @@ class LocationForm(forms.ModelForm):
 class MaintenanceEventForm(VehicleTypeFieldMixin, forms.ModelForm):
     class Meta:
         model = Event
-        fields = ['vehicle', 'date', 'maintenance_category', 'miles', 'hours', 'total_cost', 'notes']
+        fields = ['vehicle', 'date', 'miles', 'hours', 'total_cost', 'notes']
         widgets = {
             'vehicle': forms.Select(attrs={'class': 'form-select', 'data-filter-categories': 'true'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'maintenance_category': forms.Select(attrs={'class': 'form-select'}),
             'miles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1'}),
             'hours': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'total_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'e.g., 29.99'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'total_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Total cost (optional)', 'readonly': True}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'General notes about this maintenance event'}),
         }
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        
+
         # Set current date as default
         self.fields['date'].initial = date.today()
-        
+
         # Limit vehicle choices to vehicles in user's families
         if user:
             user_families = user.families.all()
             self.fields['vehicle'].queryset = Vehicle.objects.filter(family__in=user_families)
-        
-        # Filter maintenance categories based on vehicle type if editing existing event
-        if self.instance and self.instance.pk and self.instance.vehicle:
-            vehicle_type = self.instance.vehicle.type
-            from .models import MaintenanceCategory
-            self.fields['maintenance_category'].queryset = MaintenanceCategory.objects.filter(
-                vehicle_types__contains=[vehicle_type]
-            )
-        else:
-            # For new records, show all categories initially
-            # JavaScript will filter them when vehicle is selected
-            from .models import MaintenanceCategory
-            self.fields['maintenance_category'].queryset = MaintenanceCategory.objects.all()
+
+        # Add help text
+        self.fields['total_cost'].help_text = 'Will be calculated from individual item costs'
+        self.fields['total_cost'].required = False
 
 
 class MaintenanceScheduleForm(forms.ModelForm):
@@ -448,9 +445,62 @@ class UserRegisterForm(UserCreationForm):
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
         }
-        
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add Bootstrap classes to the password fields
         self.fields['password1'].widget.attrs.update({'class': 'form-control'})
         self.fields['password2'].widget.attrs.update({'class': 'form-control'})
+
+
+class MaintenanceItemForm(forms.ModelForm):
+    """Form for individual maintenance items within a maintenance event"""
+    class Meta:
+        model = MaintenanceItem
+        fields = ['maintenance_category', 'description', 'cost']
+        widgets = {
+            'maintenance_category': forms.Select(attrs={'class': 'form-select maintenance-category-select'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Additional details (optional)'}),
+            'cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        # Extract vehicle if passed
+        vehicle = kwargs.pop('vehicle', None)
+        super().__init__(*args, **kwargs)
+
+        # Filter maintenance categories based on vehicle
+        if vehicle:
+            from .models import MaintenanceCategory
+            # Get all categories that apply to this vehicle
+            all_categories = MaintenanceCategory.objects.all()
+            filtered_categories = [cat for cat in all_categories if cat.applies_to_vehicle(vehicle)]
+            self.fields['maintenance_category'].queryset = MaintenanceCategory.objects.filter(
+                id__in=[cat.id for cat in filtered_categories]
+            )
+
+
+# Create formset for maintenance items
+from django.forms import inlineformset_factory, BaseInlineFormSet
+
+class MaintenanceItemFormSet(BaseInlineFormSet):
+    """Custom formset that passes vehicle to each form"""
+    def __init__(self, *args, **kwargs):
+        self.vehicle = kwargs.pop('vehicle', None)
+        super().__init__(*args, **kwargs)
+
+    def _construct_form(self, i, **kwargs):
+        kwargs['vehicle'] = self.vehicle
+        return super()._construct_form(i, **kwargs)
+
+
+MaintenanceItemFormSet = inlineformset_factory(
+    Event,
+    MaintenanceItem,
+    form=MaintenanceItemForm,
+    formset=MaintenanceItemFormSet,
+    extra=1,  # Start with 1 empty form
+    can_delete=True,
+    min_num=1,  # Require at least one item
+    validate_min=True,
+)

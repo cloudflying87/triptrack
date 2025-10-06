@@ -25,3 +25,91 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('id_type');
+    const boatEngineTypeField = document.getElementById('id_boat_engine_type');
+    const boatEngineTypeContainer = boatEngineTypeField ? boatEngineTypeField.closest('.mb-3') : null;
+
+    // Get field containers and labels
+    const startingMileageField = document.getElementById('id_starting_mileage');
+    const startingMileageContainer = startingMileageField ? startingMileageField.closest('.mb-3') : null;
+    const startingMileageLabel = startingMileageContainer ? startingMileageContainer.querySelector('label') : null;
+
+    const vinField = document.getElementById('id_vin');
+    const vinContainer = vinField ? vinField.closest('.mb-3') : null;
+    const vinLabel = vinContainer ? vinContainer.querySelector('label') : null;
+
+    const licensePlateField = document.getElementById('id_license_plate');
+    const licensePlateContainer = licensePlateField ? licensePlateField.closest('.mb-3') : null;
+
+    function updateFieldsForVehicleType() {
+        if (!typeSelect) return;
+
+        const isBoat = typeSelect.value === 'boat';
+        const isCar = typeSelect.value === 'car';
+
+        // Toggle boat engine type field
+        if (boatEngineTypeContainer) {
+            if (isBoat) {
+                boatEngineTypeContainer.style.display = 'block';
+            } else {
+                boatEngineTypeContainer.style.display = 'none';
+                boatEngineTypeField.value = '';
+            }
+        }
+
+        // Update starting mileage/hours label and help text
+        if (startingMileageLabel) {
+            if (isBoat) {
+                startingMileageLabel.textContent = 'Starting hours';
+                if (startingMileageField) {
+                    startingMileageField.placeholder = 'e.g., 100.5';
+                }
+            } else if (isCar) {
+                startingMileageLabel.textContent = 'Starting mileage';
+                if (startingMileageField) {
+                    startingMileageField.placeholder = 'e.g., 50000';
+                }
+            } else {
+                startingMileageLabel.textContent = 'Starting reading';
+                if (startingMileageField) {
+                    startingMileageField.placeholder = '';
+                }
+            }
+        }
+
+        // Update VIN/Hull ID label
+        if (vinLabel) {
+            if (isBoat) {
+                vinLabel.textContent = 'Hull ID';
+            } else {
+                vinLabel.textContent = 'VIN';
+            }
+        }
+
+        // Show/hide license plate (hide for boats)
+        if (licensePlateContainer) {
+            if (isBoat) {
+                licensePlateContainer.style.display = 'none';
+                if (licensePlateField) {
+                    licensePlateField.value = '';
+                }
+            } else {
+                licensePlateContainer.style.display = 'block';
+            }
+        }
+    }
+
+    // Run on page load
+    updateFieldsForVehicleType();
+
+    // Run when type changes
+    if (typeSelect) {
+        typeSelect.addEventListener('change', updateFieldsForVehicleType);
+    }
+});
+</script>
+{% endblock %}

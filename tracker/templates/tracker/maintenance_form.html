@@ -1,0 +1,315 @@
+<!-- tracker/templates/tracker/maintenance_form.html -->
+{% extends 'tracker/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}TripTracker - {% if event %}Edit Maintenance{% else %}Add Maintenance{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .formset-row {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #f8f9fa;
+    }
+    .formset-row.to-delete {
+        opacity: 0.5;
+    }
+    .add-item-btn {
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-10 mx-auto">
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    {% if event %}
+                        Edit Maintenance Record
+                    {% else %}
+                        Add New Maintenance Record
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="post" id="maintenance-form">
+                    {% csrf_token %}
+
+                    <!-- Event Information -->
+                    <h5>Event Information</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.vehicle|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.date|as_crispy_field }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.miles|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.hours|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.total_cost|as_crispy_field }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.notes|as_crispy_field }}
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Maintenance Items -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5>Maintenance Items</h5>
+                        <button type="button" class="btn btn-sm btn-success" id="add-item">
+                            <i class="bi bi-plus-circle"></i> Add Item
+                        </button>
+                    </div>
+
+                    {{ formset.management_form }}
+
+                    <div id="formset-container">
+                        {% for form in formset %}
+                            <div class="formset-row" data-formset-index="{{ forloop.counter0 }}">
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <div class="mb-3">
+                                            <label for="{{ form.maintenance_category.id_for_label }}" class="form-label">
+                                                Maintenance Type <span class="text-danger">*</span>
+                                            </label>
+                                            {{ form.maintenance_category }}
+                                            {% if form.maintenance_category.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.maintenance_category.errors }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                                            {{ form.description }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="mb-3">
+                                            <label for="{{ form.cost.id_for_label }}" class="form-label">Cost</label>
+                                            {{ form.cost }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1 d-flex align-items-center">
+                                        {% if not forloop.first %}
+                                            <button type="button" class="btn btn-sm btn-danger delete-item" data-index="{{ forloop.counter0 }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        {% endif %}
+                                        {{ form.id }}
+                                        {{ form.DELETE }}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {{ formset.non_form_errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Save Maintenance Record</button>
+                        <a href="{% if event %}{% url 'vehicle_detail' event.vehicle.pk %}{% else %}{% url 'event_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formsetContainer = document.getElementById('formset-container');
+    const addButton = document.getElementById('add-item');
+    const totalFormsInput = document.getElementById('id_maintenance_items-TOTAL_FORMS');
+
+    // Function to update form indices
+    function updateFormIndices() {
+        const forms = formsetContainer.querySelectorAll('.formset-row:not(.to-delete)');
+        forms.forEach((form, index) => {
+            form.setAttribute('data-formset-index', index);
+
+            // Update all form fields with new index
+            form.querySelectorAll('select, input, textarea').forEach(field => {
+                const name = field.getAttribute('name');
+                const id = field.getAttribute('id');
+
+                if (name) {
+                    field.setAttribute('name', name.replace(/maintenance_items-\d+-/, `maintenance_items-${index}-`));
+                }
+                if (id) {
+                    field.setAttribute('id', id.replace(/id_maintenance_items-\d+-/, `id_maintenance_items-${index}-`));
+                }
+            });
+
+            // Update labels
+            form.querySelectorAll('label').forEach(label => {
+                const forAttr = label.getAttribute('for');
+                if (forAttr) {
+                    label.setAttribute('for', forAttr.replace(/id_maintenance_items-\d+-/, `id_maintenance_items-${index}-`));
+                }
+            });
+        });
+
+        totalFormsInput.value = forms.length;
+    }
+
+    // Add new form
+    addButton.addEventListener('click', function() {
+        const currentFormCount = parseInt(totalFormsInput.value);
+        const newForm = formsetContainer.querySelector('.formset-row').cloneNode(true);
+
+        // Clear values in the new form
+        newForm.querySelectorAll('select, input, textarea').forEach(field => {
+            if (field.type === 'checkbox') {
+                field.checked = false;
+            } else {
+                field.value = '';
+            }
+        });
+
+        // Add delete button if it doesn't exist
+        if (!newForm.querySelector('.delete-item')) {
+            const deleteCol = newForm.querySelector('.col-md-1');
+            deleteCol.innerHTML = `
+                <button type="button" class="btn btn-sm btn-danger delete-item" data-index="${currentFormCount}">
+                    <i class="bi bi-trash"></i>
+                </button>
+            ` + deleteCol.innerHTML;
+        }
+
+        formsetContainer.appendChild(newForm);
+        updateFormIndices();
+
+        // Add event listener to new delete button
+        const newDeleteBtn = newForm.querySelector('.delete-item');
+        if (newDeleteBtn) {
+            newDeleteBtn.addEventListener('click', deleteItem);
+        }
+    });
+
+    // Delete item function
+    function deleteItem(e) {
+        const row = e.target.closest('.formset-row');
+        const deleteCheckbox = row.querySelector('input[name$="-DELETE"]');
+
+        if (deleteCheckbox && deleteCheckbox.value !== 'on') {
+            // Mark for deletion
+            deleteCheckbox.checked = true;
+            row.classList.add('to-delete');
+            row.style.display = 'none';
+        } else {
+            // Remove from DOM if it's a new unsaved form
+            row.remove();
+        }
+
+        updateFormIndices();
+    }
+
+    // Add event listeners to existing delete buttons
+    document.querySelectorAll('.delete-item').forEach(btn => {
+        btn.addEventListener('click', deleteItem);
+    });
+
+    // Auto-calculate total cost
+    function calculateTotalCost() {
+        let total = 0;
+        document.querySelectorAll('.formset-row:not(.to-delete) input[name$="-cost"]').forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+
+        const totalCostInput = document.getElementById('id_total_cost');
+        if (totalCostInput) {
+            totalCostInput.value = total.toFixed(2);
+        }
+    }
+
+    // Add event listeners for cost calculation
+    formsetContainer.addEventListener('input', function(e) {
+        if (e.target.name && e.target.name.endsWith('-cost')) {
+            calculateTotalCost();
+        }
+    });
+
+    // Calculate on page load
+    calculateTotalCost();
+
+    // Function to update maintenance category options based on vehicle
+    function updateMaintenanceCategories(vehicleId) {
+        if (!vehicleId) return;
+
+        fetch(`/api/maintenance-categories/?vehicle=${vehicleId}`)
+            .then(response => response.json())
+            .then(data => {
+                // Update all maintenance category dropdowns
+                document.querySelectorAll('.maintenance-category-select').forEach(select => {
+                    const currentValue = select.value;
+
+                    // Clear existing options except the empty one
+                    select.innerHTML = '<option value="">---------</option>';
+
+                    // Add filtered categories
+                    data.categories.forEach(category => {
+                        const option = new Option(category.name, category.id);
+                        select.add(option);
+                    });
+
+                    // Try to restore previous selection if it's still valid
+                    if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+                        select.value = currentValue;
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching maintenance categories:', error);
+            });
+    }
+
+    // Listen for vehicle changes
+    const vehicleSelect = document.getElementById('id_vehicle');
+    if (vehicleSelect) {
+        vehicleSelect.addEventListener('change', function() {
+            updateMaintenanceCategories(this.value);
+        });
+
+        // Update categories on page load if vehicle is already selected
+        if (vehicleSelect.value) {
+            updateMaintenanceCategories(vehicleSelect.value);
+        }
+    }
+});
+</script>
+{% endblock %}

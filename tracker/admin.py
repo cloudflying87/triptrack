@@ -4,8 +4,8 @@ from django.db.models import Count, Sum, Avg
 from django.utils import timezone
 from datetime import timedelta
 from .models import (
-    Family, Vehicle, Location, Event, 
-    MaintenanceCategory, TodoItem, MaintenanceSchedule
+    Family, Vehicle, Location, Event,
+    MaintenanceCategory, TodoItem, MaintenanceSchedule, MaintenanceItem
 )
 
 
@@ -18,6 +18,13 @@ class VehicleInline(admin.TabularInline):
     show_change_link = True
 
 
+class MaintenanceItemInline(admin.TabularInline):
+    model = MaintenanceItem
+    extra = 0
+    fields = ('maintenance_category', 'description', 'cost')
+    show_change_link = True
+
+
 class EventInline(admin.TabularInline):
     model = Event
     extra = 0
@@ -25,7 +32,7 @@ class EventInline(admin.TabularInline):
     readonly_fields = ('created_at',)
     can_delete = False
     show_change_link = True
-    
+
     def has_add_permission(self, request, obj=None):
         return False
 
@@ -63,14 +70,14 @@ class FamilyAdmin(admin.ModelAdmin):
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'family', 'make', 'model', 'year', 'type', 'license_plate', 
+    list_display = ('name', 'family', 'make', 'model', 'year', 'type', 'boat_engine_type', 'license_plate',
                    'total_miles_or_hours', 'maintenance_status')
-    list_filter = ('type', 'family', 'year')
+    list_filter = ('type', 'boat_engine_type', 'family', 'year')
     search_fields = ('name', 'make', 'model', 'vin', 'license_plate')
     readonly_fields = ('created_at', 'current_mileage_display', 'maintenance_status_detail')
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'family', 'type')
+            'fields': ('name', 'family', 'type', 'boat_engine_type')
         }),
         ('Vehicle Details', {
             'fields': ('make', 'model', 'year', 'vin', 'license_plate')
@@ -147,12 +154,13 @@ class VehicleAdmin(admin.ModelAdmin):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('vehicle', 'event_type', 'date', 'mileage_or_hours', 'cost_display', 
+    list_display = ('vehicle', 'event_type', 'date', 'mileage_or_hours', 'cost_display',
                    'maintenance_category', 'location', 'created_by')
     list_filter = ('event_type', 'date', 'vehicle__family', 'maintenance_category', 'location')
     search_fields = ('vehicle__name', 'notes', 'maintenance_category__name', 'location__name')
     date_hierarchy = 'date'
     readonly_fields = ('created_at', 'created_by', 'mpg_display')
+    inlines = [MaintenanceItemInline]
     fieldsets = (
         ('Event Information', {
             'fields': ('vehicle', 'event_type', 'date', 'notes')
@@ -258,22 +266,66 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(MaintenanceCategory)
 class MaintenanceCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'event_count', 'last_used')
+    list_display = ('name', 'vehicle_types_display', 'boat_engine_types_display', 'event_count', 'last_used')
     search_fields = ('name', 'description')
     ordering = ('name',)
-    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description')
+        }),
+        ('Applicability', {
+            'fields': ('vehicle_types', 'boat_engine_types'),
+            'description': 'Select which vehicle types and boat engine types this maintenance category applies to'
+        }),
+    )
+
+    def vehicle_types_display(self, obj):
+        if not obj.vehicle_types:
+            return 'None'
+        return ', '.join(obj.vehicle_types)
+    vehicle_types_display.short_description = 'Vehicle Types'
+
+    def boat_engine_types_display(self, obj):
+        if not obj.boat_engine_types:
+            return 'All'
+        return ', '.join(obj.boat_engine_types)
+    boat_engine_types_display.short_description = 'Boat Engine Types'
+
     def event_count(self, obj):
         return obj.events.count()
     event_count.short_description = 'Total Events'
-    
+
     def last_used(self, obj):
         last_event = obj.events.order_by('-date').first()
         if last_event:
             return last_event.date
         return "Never"
     last_used.short_description = 'Last Used'
-    
-    # MaintenanceCategory doesn't have is_active field, so no activation/deactivation actions needed
+
+
+@admin.register(MaintenanceItem)
+class MaintenanceItemAdmin(admin.ModelAdmin):
+    list_display = ('maintenance_category', 'event_date', 'event_vehicle', 'description_short', 'cost')
+    list_filter = ('maintenance_category', 'event__date', 'event__vehicle__family')
+    search_fields = ('maintenance_category__name', 'description', 'event__vehicle__name')
+    date_hierarchy = 'event__date'
+    readonly_fields = ('created_at',)
+
+    def event_date(self, obj):
+        return obj.event.date
+    event_date.short_description = 'Date'
+    event_date.admin_order_field = 'event__date'
+
+    def event_vehicle(self, obj):
+        return obj.event.vehicle
+    event_vehicle.short_description = 'Vehicle'
+    event_vehicle.admin_order_field = 'event__vehicle'
+
+    def description_short(self, obj):
+        if obj.description:
+            return obj.description[:50] + '...' if len(obj.description) > 50 else obj.description
+        return '-'
+    description_short.short_description = 'Description'
 
 
 @admin.register(TodoItem)

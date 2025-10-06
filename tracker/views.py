@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 import os
-from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory, MaintenanceSchedule, Family
+from .models import Vehicle, Event, Location, TodoItem, MaintenanceCategory, MaintenanceSchedule, Family, MaintenanceItem
 from .forms import (VehicleForm, MaintenanceEventForm, GasEventForm, 
                   OutingEventForm, TodoItemForm, LocationForm, UserRegisterForm,
                   FamilyForm, FamilyMemberForm,MaintenanceScheduleForm)
@@ -465,32 +465,129 @@ class EventCreateView(LoginRequiredMixin, TemplateView):
 class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     model = Event
     form_class = MaintenanceEventForm
-    template_name = 'tracker/event_form.html'
-    
+    template_name = 'tracker/maintenance_form.html'
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
-    
+
     def get_initial(self):
         initial = super().get_initial()
         vehicle_id = self.request.GET.get('vehicle')
+        schedule_id = self.request.GET.get('schedule')
+
         if vehicle_id:
             initial['vehicle'] = vehicle_id
+
+        # Pre-fill current reading if vehicle is selected
+        if vehicle_id:
+            try:
+                vehicle = Vehicle.objects.get(pk=vehicle_id)
+                latest_reading = vehicle.get_latest_miles_or_hours()
+                if vehicle.type == 'car':
+                    initial['miles'] = latest_reading
+                else:
+                    initial['hours'] = latest_reading
+            except Vehicle.DoesNotExist:
+                pass
+
         return initial
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['event_type'] = 'maintenance'
+
+        # Get vehicle for filtering categories
+        vehicle = None
+        vehicle_id = self.request.GET.get('vehicle')
+        if vehicle_id:
+            try:
+                vehicle = Vehicle.objects.get(pk=vehicle_id)
+            except Vehicle.DoesNotExist:
+                pass
+
+        # Get schedule if specified
+        schedule_id = self.request.GET.get('schedule')
+        if schedule_id:
+            try:
+                schedule = MaintenanceSchedule.objects.get(pk=schedule_id)
+                context['schedule'] = schedule
+                if not vehicle:
+                    vehicle = schedule.vehicle
+            except MaintenanceSchedule.DoesNotExist:
+                pass
+
+        # Add formset to context
+        from .forms import MaintenanceItemFormSet
+        if self.request.POST:
+            # Get vehicle from POST data
+            if not vehicle and 'vehicle' in self.request.POST:
+                try:
+                    vehicle = Vehicle.objects.get(pk=self.request.POST['vehicle'])
+                except (Vehicle.DoesNotExist, ValueError):
+                    pass
+            context['formset'] = MaintenanceItemFormSet(self.request.POST, instance=self.object, vehicle=vehicle)
+        else:
+            # Pre-populate formset with schedule's maintenance type if coming from schedule
+            if schedule_id and not self.request.POST:
+                try:
+                    schedule = MaintenanceSchedule.objects.get(pk=schedule_id)
+                    # Create a formset with initial data
+                    formset = MaintenanceItemFormSet(instance=self.object, vehicle=vehicle, initial=[
+                        {'maintenance_category': schedule.maintenance_type}
+                    ])
+                    context['formset'] = formset
+                except MaintenanceSchedule.DoesNotExist:
+                    context['formset'] = MaintenanceItemFormSet(instance=self.object, vehicle=vehicle)
+            else:
+                context['formset'] = MaintenanceItemFormSet(instance=self.object, vehicle=vehicle)
+
         return context
-    
+
     def form_valid(self, form):
+        from .forms import MaintenanceItemFormSet
+        from decimal import Decimal
+        from datetime import date
+
+        context = self.get_context_data()
+        formset = context['formset']
+
         event = form.save(commit=False)
         event.created_by = self.request.user
         event.event_type = 'maintenance'
-        event.save()
-        messages.success(self.request, 'Maintenance record added successfully!')
-        return redirect('vehicle_detail', pk=event.vehicle.pk)
+
+        if formset.is_valid():
+            event.save()
+            formset.instance = event
+            maintenance_items = formset.save()
+
+            # Calculate total cost from maintenance items
+            total_cost = sum([item.cost or Decimal('0.00') for item in maintenance_items])
+            if total_cost > 0:
+                event.total_cost = total_cost
+                event.save()
+
+            # Update maintenance schedule if this was created from a schedule
+            schedule_id = self.request.GET.get('schedule')
+            if schedule_id:
+                try:
+                    schedule = MaintenanceSchedule.objects.get(pk=schedule_id)
+                    schedule.last_performed = event.date
+                    if event.miles:
+                        schedule.last_miles = int(event.miles)
+                    if event.hours:
+                        schedule.last_hours = int(event.hours)
+                    schedule.save()
+                    messages.success(self.request, f'Maintenance record added and schedule "{schedule.name}" updated!')
+                except MaintenanceSchedule.DoesNotExist:
+                    messages.success(self.request, f'Maintenance record added successfully with {len(maintenance_items)} items!')
+            else:
+                messages.success(self.request, f'Maintenance record added successfully with {len(maintenance_items)} items!')
+
+            return redirect('vehicle_detail', pk=event.vehicle.pk)
+        else:
+            return self.form_invalid(form)
 
 class GasCreateView(LoginRequiredMixin, CreateView):
     model = Event
@@ -568,8 +665,13 @@ class OutingCreateView(LoginRequiredMixin, CreateView):
 
 class EventUpdateView(LoginRequiredMixin, UpdateView):
     model = Event
-    template_name = 'tracker/event_form.html'
-    
+
+    def get_template_names(self):
+        event = self.get_object()
+        if event.event_type == 'maintenance':
+            return ['tracker/maintenance_form.html']
+        return ['tracker/event_form.html']
+
     def get_form_class(self):
         event = self.get_object()
         if event.event_type == 'maintenance':
@@ -578,24 +680,60 @@ class EventUpdateView(LoginRequiredMixin, UpdateView):
             return GasEventForm
         else:  # outing
             return OutingEventForm
-    
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         event = self.get_object()
         context['event_type'] = event.event_type
         context['event'] = event
+
+        # Add formset for maintenance events
+        if event.event_type == 'maintenance':
+            from .forms import MaintenanceItemFormSet
+            vehicle = event.vehicle
+            if self.request.POST:
+                context['formset'] = MaintenanceItemFormSet(self.request.POST, instance=event, vehicle=vehicle)
+            else:
+                context['formset'] = MaintenanceItemFormSet(instance=event, vehicle=vehicle)
+
         return context
-    
+
     def form_valid(self, form):
-        event = form.save()
-        messages.success(self.request, f'{event.event_type.title()} record updated successfully!')
-        return redirect('vehicle_detail', pk=event.vehicle.pk)
-    
+        event = self.get_object()
+
+        # Handle formset for maintenance events
+        if event.event_type == 'maintenance':
+            from .forms import MaintenanceItemFormSet
+            from decimal import Decimal
+
+            context = self.get_context_data()
+            formset = context['formset']
+
+            if formset.is_valid():
+                event = form.save()
+                formset.instance = event
+                maintenance_items = formset.save()
+
+                # Calculate total cost from maintenance items
+                total_cost = sum([item.cost or Decimal('0.00') for item in maintenance_items])
+                if total_cost > 0:
+                    event.total_cost = total_cost
+                    event.save()
+
+                messages.success(self.request, f'Maintenance record updated successfully with {len(maintenance_items)} items!')
+                return redirect('vehicle_detail', pk=event.vehicle.pk)
+            else:
+                return self.form_invalid(form)
+        else:
+            event = form.save()
+            messages.success(self.request, f'{event.event_type.title()} record updated successfully!')
+            return redirect('vehicle_detail', pk=event.vehicle.pk)
+
     def test_func(self):
         event = self.get_object()
         # Check if user is in the family that owns the vehicle
@@ -752,11 +890,13 @@ class LocationListView(LoginRequiredMixin, ListView):
     model = Location
     context_object_name = 'locations'
     template_name = 'tracker/location_list.html'
-    
+
     def get_queryset(self):
         # Get all locations in families the user belongs to
         user_families = self.request.user.families.all()
-        return Location.objects.filter(family__in=user_families)
+        return Location.objects.filter(family__in=user_families).annotate(
+            visit_count=Count('event', filter=Q(event__event_type='outing'))
+        ).order_by('-visit_count', 'name')
 
 class LocationDetailView(LoginRequiredMixin, DetailView):
     model = Location
@@ -955,7 +1095,14 @@ class VehicleReportView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             events = events.filter(date__lte=end_date)
         
         # Group events by type (ordered by newest first)
-        maintenance_events = events.filter(event_type='maintenance').order_by('-date')
+        maintenance_events_raw = events.filter(event_type='maintenance').order_by('-date')
+
+        # Get individual maintenance items for detailed display
+        from .models import MaintenanceItem
+        maintenance_items = MaintenanceItem.objects.filter(
+            event__in=maintenance_events_raw
+        ).select_related('event', 'maintenance_category').order_by('-event__date')
+
         gas_events_raw = events.filter(event_type='gas').order_by('-date')
         outing_events = events.filter(event_type='outing').order_by('-date')
 
@@ -991,7 +1138,7 @@ class VehicleReportView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             gas_events.append(event_data)
         
         # Calculate statistics
-        total_maintenance_cost = maintenance_events.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
+        total_maintenance_cost = maintenance_events_raw.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
         total_gas_cost = gas_events_raw.aggregate(Sum('total_cost'))['total_cost__sum'] or 0
         
         # Calculate MPG
@@ -1175,7 +1322,8 @@ class VehicleReportView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             ytd_usage = (last_reading - year_start_reading) if (last_reading and year_start_reading) else None
 
         context.update({
-            'maintenance_events': maintenance_events,
+            'maintenance_events': maintenance_events_raw,
+            'maintenance_items': maintenance_items,
             'gas_events': gas_events,
             'outing_events': outing_events,
             'total_maintenance_cost': total_maintenance_cost,
@@ -1292,6 +1440,61 @@ class VehicleUsageAnalyticsView(LoginRequiredMixin, UserPassesTestMixin, DetailV
         vehicle = self.get_object()
         # Check if user is in the family that owns the vehicle
         return self.request.user.families.filter(id=vehicle.family.id).exists()
+
+class MaintenanceItemsListView(LoginRequiredMixin, ListView):
+    model = MaintenanceItem
+    template_name = 'tracker/maintenance_items_list.html'
+    context_object_name = 'maintenance_items'
+    paginate_by = 50
+
+    def get_queryset(self):
+        # Get all maintenance items for vehicles in user's families
+        user_families = self.request.user.families.all()
+        queryset = MaintenanceItem.objects.filter(
+            event__vehicle__family__in=user_families
+        ).select_related(
+            'event', 'event__vehicle', 'maintenance_category'
+        ).order_by('-event__date')
+
+        # Filter by search query
+        search_query = self.request.GET.get('search')
+        if search_query:
+            queryset = queryset.filter(
+                Q(maintenance_category__name__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(event__vehicle__name__icontains=search_query)
+            )
+
+        # Filter by vehicle
+        vehicle_id = self.request.GET.get('vehicle')
+        if vehicle_id:
+            queryset = queryset.filter(event__vehicle_id=vehicle_id)
+
+        # Filter by maintenance category
+        category_id = self.request.GET.get('category')
+        if category_id:
+            queryset = queryset.filter(maintenance_category_id=category_id)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Get user's vehicles for filter dropdown
+        user_families = self.request.user.families.all()
+        context['vehicles'] = Vehicle.objects.filter(family__in=user_families)
+
+        # Get all maintenance categories
+        from .models import MaintenanceCategory
+        context['categories'] = MaintenanceCategory.objects.all()
+
+        # Pass current filters to template
+        context['search_query'] = self.request.GET.get('search', '')
+        context['selected_vehicle'] = self.request.GET.get('vehicle', '')
+        context['selected_category'] = self.request.GET.get('category', '')
+
+        return context
+
 
 class EventImportView(LoginRequiredMixin, View):
     template_name = 'tracker/event_import.html'
@@ -1900,28 +2103,40 @@ class VehicleDetailAPIView(LoginRequiredMixin, APIView):
 @login_required
 @require_GET
 def maintenance_categories_api(request):
-    """API endpoint to get maintenance categories filtered by vehicle type"""
+    """API endpoint to get maintenance categories filtered by vehicle type and boat engine type"""
     vehicle_id = request.GET.get('vehicle')
-    
+
     if not vehicle_id:
         return JsonResponse({'categories': []})
-    
+
     try:
         # Get the vehicle and check user access
         user_families = request.user.families.all()
         vehicle = Vehicle.objects.get(pk=vehicle_id, family__in=user_families)
-        
-        # Get categories that apply to this vehicle type
+
+        # Get categories that apply to this vehicle
         from .models import MaintenanceCategory
-        categories = MaintenanceCategory.objects.filter(
-            vehicle_types__contains=[vehicle.type]
-        ).values('id', 'name', 'description')
-        
+        all_categories = MaintenanceCategory.objects.all()
+
+        # Filter categories using the applies_to_vehicle method
+        filtered_categories = [cat for cat in all_categories if cat.applies_to_vehicle(vehicle)]
+
+        # Convert to list of dicts
+        categories_data = [
+            {
+                'id': cat.id,
+                'name': cat.name,
+                'description': cat.description or ''
+            }
+            for cat in filtered_categories
+        ]
+
         return JsonResponse({
-            'categories': list(categories),
-            'vehicle_type': vehicle.type
+            'categories': categories_data,
+            'vehicle_type': vehicle.type,
+            'boat_engine_type': vehicle.boat_engine_type if vehicle.type == 'boat' else None
         })
-        
+
     except Vehicle.DoesNotExist:
         return JsonResponse({'error': 'Vehicle not found or access denied'}, status=404)
     except Exception as e:

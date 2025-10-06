@@ -20,7 +20,10 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title">{{ location.name }}</h5>
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title">{{ location.name }}</h5>
+                    <span class="badge bg-primary">{{ location.visit_count }} visit{{ location.visit_count|pluralize }}</span>
+                </div>
                 {% if location.address %}
                 <p class="card-text">
                     <i class="bi bi-geo-alt"></i> {{ location.address }}

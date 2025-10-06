@@ -11,33 +11,57 @@
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-8">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>{{ vehicle.name }}</h1>
+        <div class="d-flex justify-content-between align-items-start">
             <div>
-                <a href="{% url 'vehicle_update' vehicle.pk %}" class="btn btn-outline-primary">
+                <h1>{{ vehicle.name }}</h1>
+                <p class="lead mb-2">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
+                <div class="mb-3">
+                    <span class="badge bg-primary me-2">{{ vehicle.get_type_display }}</span>
+                    {% if vehicle.type == 'boat' and vehicle.boat_engine_type %}
+                        <span class="badge bg-info me-2">
+                            <i class="bi bi-gear"></i> {{ vehicle.get_boat_engine_type_display }}
+                        </span>
+                    {% endif %}
+                    {% if vehicle.license_plate %}
+                        <span class="badge bg-secondary me-2">
+                            <i class="bi bi-credit-card"></i> {{ vehicle.license_plate }}
+                        </span>
+                    {% endif %}
+                </div>
+                {% if vehicle.vin %}
+                    <p class="text-muted mb-2">
+                        <strong>{% if vehicle.type == 'boat' %}Hull ID:{% else %}VIN:{% endif %}</strong> {{ vehicle.vin }}
+                    </p>
+                {% endif %}
+                {% if vehicle.family %}
+                    <p class="text-muted mb-3"><strong>Family:</strong> {{ vehicle.family.name }}</p>
+                {% endif %}
+            </div>
+            <div class="btn-group-vertical">
+                <a href="{% url 'vehicle_update' vehicle.pk %}" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
-                <a href="{% url 'vehicle_delete' vehicle.pk %}" class="btn btn-outline-danger">
+                <a href="{% url 'vehicle_delete' vehicle.pk %}" class="btn btn-outline-danger btn-sm">
                     <i class="bi bi-trash"></i> Delete
                 </a>
             </div>
         </div>
-        <p class="lead">{{ vehicle.year }} {{ vehicle.make }} {{ vehicle.model }}</p>
-        <div class="mb-2">
-            <span class="badge bg-primary">{{ vehicle.get_type_display }}</span>
+
+        <!-- Quick Links -->
+        <div class="d-flex gap-2 flex-wrap mt-3">
+            <a href="{% url 'vehicle_report' vehicle.pk %}" class="btn btn-primary">
+                <i class="bi bi-file-earmark-text"></i> Full Report
+            </a>
+            <a href="{% url 'vehicle_usage_analytics' vehicle.pk %}" class="btn btn-info">
+                <i class="bi bi-graph-up"></i> Usage Analytics
+            </a>
+            <a href="{% url 'maintenance_items_list' %}?vehicle={{ vehicle.pk }}" class="btn btn-success">
+                <i class="bi bi-wrench"></i> Maintenance History
+            </a>
+            <a href="{% url 'maintenance_schedule_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar-check"></i> Schedules
+            </a>
         </div>
-        {% if vehicle.license_plate or vehicle.vin %}
-        <div class="card mb-2">
-            <div class="card-body p-2">
-                {% if vehicle.license_plate %}
-                <p class="mb-1"><strong>License Plate:</strong> {{ vehicle.license_plate }}</p>
-                {% endif %}
-                {% if vehicle.vin %}
-                <p class="mb-0"><strong>VIN:</strong> {{ vehicle.vin }}</p>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
     <div class="col-md-4">
         {% if vehicle.image %}
