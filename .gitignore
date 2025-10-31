@@ -4,6 +4,7 @@
 *.pyc
 jsonbackup/
 **/fixtures
+.DS_Store
 .ds_store
 /airline/credentials.json
 credentials.json
