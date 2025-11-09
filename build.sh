@@ -12,7 +12,7 @@ MIGRATE=false
 DOWNLOAD=false
 SETUP=false
 REMOTE_SERVER="davidhale87@172.16.205.4"
-REMOTE_BACKUP_DIR="/halefiles/Coding/TripTrackDBBackups"
+REMOTE_BACKUP_DIR="/mnt/Storage/Database_Backups/TripTrack"
 
 # Project specific settings
 PROJECT_NAME="triptrack"
